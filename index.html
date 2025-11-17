@@ -446,6 +446,37 @@
               <li><a href="#snippet-8-5">Mocking עם @patch</a></li>
             </ul>
           </div>
+          <div class="toc-category">
+            <h3><i class="fas fa-tools"></i> פונקציות עזר</h3>
+            <ul class="toc-links">
+              <li><a href="#snippet-9-1">זמן יחסי בעברית</a></li>
+              <li><a href="#snippet-9-2">אסקייפ ל-Markdown</a></li>
+              <li><a href="#snippet-9-3">ניקוי שמות קבצים</a></li>
+              <li><a href="#snippet-9-4">מענה בטוח ל-CallbackQuery</a></li>
+              <li><a href="#snippet-9-5">פיצול הודעות ארוכות</a></li>
+              <li><a href="#snippet-9-6">עריכת הודעה בטוחה</a></li>
+              <li><a href="#snippet-9-7">מניעת לחיצה כפולה</a></li>
+              <li><a href="#snippet-9-8">עיבוד פריטים בקבוצות</a></li>
+              <li><a href="#snippet-9-9">מדידת זמן</a></li>
+              <li><a href="#snippet-9-10">בדיקת קוד מסוכן</a></li>
+            </ul>
+          </div>
+          <div class="toc-category">
+            <h3><i class="fas fa-tasks"></i> Background Jobs</h3>
+            <ul class="toc-links">
+              <li><a href="#snippet-10-1">RQ Job עם Retry</a></li>
+              <li><a href="#snippet-10-2">Enqueue or Run Inline</a></li>
+            </ul>
+          </div>
+          <div class="toc-category">
+            <h3><i class="fas fa-robot"></i> תבניות בוט טלגרם</h3>
+            <ul class="toc-links">
+              <li><a href="#snippet-11-1">Maintenance Mode</a></li>
+              <li><a href="#snippet-11-2">Callback Query Router</a></li>
+              <li><a href="#snippet-11-3">Safe Send עם Fallback</a></li>
+              <li><a href="#snippet-11-4">Message Chunking</a></li>
+            </ul>
+          </div>
         </div>
       </div>
 
@@ -1465,7 +1496,1217 @@ reply_markup <span class="token operator">=</span> InlineKeyboardMarkup<span cla
           <h2>Structured Logging</h2>
         </div>
 
-        <div class="snippet" id="snippet-6-1"></div>
+        <div class="snippet" id="snippet-6-1">
+          <div class="snippet-header">
+            <h3 class="snippet-title">6.1 Emit Event עם Request ID</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> לוגים מובנים עם מעקב אחר request ייחודי לאורך כל התהליך.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import structlog
+from typing import Any
+
+def emit_event(event: str, severity: str = "info", **fields: Any) -> None:
+    """שולח אירוע לוג מובנה"""
+
+    logger = structlog.get_logger()
+    fields.setdefault("event", event)
+
+    # הוספת request_id מהקונטקסט
+    if severity in {"error", "critical"}:
+        ctx = get_observability_context()
+        request_id = str(fields.get("request_id") or ctx.get("request_id") or "").strip()
+        if request_id and "request_id" not in fields:
+            fields["request_id"] = request_id
+
+        # העשרת context עם command, user_id, chat_id
+        command_tag = _sanitize_command_identifier(fields.get("command")) or str(ctx.get("command") or "")
+        user_tag = _hash_identifier(fields.get("user_id")) or str(ctx.get("user_id") or "")
+        chat_tag = _hash_identifier(fields.get("chat_id")) or str(ctx.get("chat_id") or "")
+
+        if command_tag:
+            fields["command"] = command_tag
+        if user_tag:
+            fields["user_id"] = user_tag
+        if chat_tag:
+            fields["chat_id"] = chat_tag
+
+    # שליחת לוג
+    log_method = getattr(logger, severity, logger.info)
+    log_method(event, **fields)
+
+# שימוש:
+# emit_event("file_saved", severity="info", user_id=123, file_name="main.py")
+# emit_event("db_error", severity="error", error=str(e), request_id=req_id)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-6-2">
+          <div class="snippet-header">
+            <h3 class="snippet-title">6.2 Binding Request ID לקונטקסט</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> קושר request_id לכל הלוגים בזרימה הנוכחית (גם async).</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import structlog
+
+def bind_request_id(request_id: str) -> None:
+    """קושר request_id לכל הלוגים בהקשר הנוכחי"""
+    try:
+        structlog.contextvars.bind_contextvars(request_id=request_id)
+    except Exception:
+        pass
+
+    # שליחה גם ל-Sentry
+    _set_sentry_tag("request_id", request_id)
+
+# שימוש בתחילת request:
+# request_id = generate_request_id()  # uuid4().hex
+# bind_request_id(request_id)
+#
+# # כל הלוגים מעכשיו יכללו את ה-request_id אוטומטית:
+# emit_event("processing_started", severity="info")
+# emit_event("processing_completed", severity="info")</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-6-3">
+          <div class="snippet-header">
+            <h3 class="snippet-title">6.3 Binding User Context</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> קישור user_id ו-chat_id לכל הלוגים בצורה אוטומטית.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import structlog
+from typing import Any, Optional, Dict
+
+def bind_user_context(
+    *,
+    user_id: Any | None = None,
+    chat_id: Any | None = None
+) -> None:
+    """קושר הקשר משתמש לכל הלוגים"""
+
+    to_bind: Dict[str, str] = {}
+
+    # Hash של user_id (אבטחת פרטיות)
+    user_hash = _hash_identifier(user_id)
+    if user_hash:
+        to_bind["user_id"] = user_hash
+        _set_sentry_tag("user_id", user_hash)
+
+    # Hash של chat_id
+    chat_hash = _hash_identifier(chat_id)
+    if chat_hash:
+        to_bind["chat_id"] = chat_hash
+        _set_sentry_tag("chat_id", chat_hash)
+
+    # קישור לקונטקסט
+    if to_bind:
+        try:
+            structlog.contextvars.bind_contextvars(**to_bind)
+        except Exception:
+            pass
+
+# שימוש:
+# bind_user_context(user_id=update.effective_user.id, chat_id=update.effective_chat.id)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-6-4">
+          <div class="snippet-header">
+            <h3 class="snippet-title">6.4 הגדרת Structlog עם Merge Context</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> קונפיגורציה מלאה של structlog עם מיזוג קונטקסט אוטומטי.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import structlog
+
+def setup_structlog_logging(min_level: str | int = "INFO") -> None:
+    """מגדיר structlog עם processors מלאים"""
+
+    level = _parse_log_level(min_level)
+
+    structlog.configure(
+        processors=[
+            structlog.contextvars.merge_contextvars,  # מיזוג context אוטומטי
+            _add_otel_ids,                             # הוספת trace_id/span_id
+            _redact_sensitive,                         # הסרת נתונים רגישים
+            _add_schema_version,                       # גרסת schema
+            structlog.processors.add_log_level,        # רמת לוג
+            _mirror_to_log_aggregator,                 # שליחה ל-aggregator
+            _maybe_sample_info,                        # דגימת info logs
+            structlog.processors.TimeStamper(fmt="iso"),
+            _choose_renderer(),  # JSON או console
+        ],
+        wrapper_class=structlog.make_filtering_bound_logger(level),
+        context_class=dict,
+        logger_factory=structlog.PrintLoggerFactory(),
+        cache_logger_on_first_use=False,
+    )
+
+# שימוש:
+# setup_structlog_logging("INFO")</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 7: הודעות שגיאה ידידותיות -->
+      <div class="category" id="category-7">
+        <div class="category-header">
+          <i class="fas fa-exclamation-triangle"></i>
+          <h2>הודעות שגיאה ידידותיות</h2>
+        </div>
+
+        <div class="snippet" id="snippet-7-1">
+          <div class="snippet-header">
+            <h3 class="snippet-title">7.1 Rate Limit Error Handler</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> טיפול בגבלת קצב עם הודעה ידידותית למשתמש + metrics.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from flask import jsonify, request
+
+@app.errorhandler(429)
+def _ratelimit_handler(e):
+    """טיפול בהגבלת קצב"""
+    try:
+        # לוגים ומטריקות (best-effort)
+        try:
+            emit_event(
+                "rate_limit_blocked",
+                severity="warning",
+                path=str(getattr(request, 'path', '')),
+                remote=str(getattr(request, 'remote_addr', '')),
+            )
+        except Exception:
+            pass
+
+        try:
+            from metrics import rate_limit_blocked
+            if rate_limit_blocked is not None:
+                scope = str(getattr(request, 'path', '') or 'route')
+                rate_limit_blocked.labels(
+                    source="webapp",
+                    scope=scope,
+                    limit="route"
+                ).inc()
+        except Exception:
+            pass
+
+        # תגובה למשתמש
+        payload = {
+            "error": "rate_limit_exceeded",
+            "message": "יותר מדי בקשות. אנא נסה שוב מאוחר יותר.",
+            "retry_after": getattr(e, 'description', None),
+        }
+        return jsonify(payload), 429
+
+    except Exception:
+        # fallback אם הכל נכשל
+        return jsonify({"error": "rate_limit_exceeded"}), 429</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-7-2">
+          <div class="snippet-header">
+            <h3 class="snippet-title">7.2 Database Error עם הודעות ספציפיות</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> טיפול בשגיאות DB ספציפיות עם הודעות מתאימות.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from pymongo.errors import DuplicateKeyError
+
+def toggle_bookmark(
+    self,
+    user_id: int,
+    file_id: str,
+    file_name: str,
+    line_number: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """מוסיף או מסיר סימנייה"""
+
+    try:
+        # Validation
+        if line_number <= 0:
+            return {
+                "ok": False,
+                "action": "error",
+                "error": "מספר שורה לא תקין"
+            }
+
+        note = kwargs.get('note', '')
+        if len(note) > MAX_NOTE_LENGTH:
+            note = note[:MAX_NOTE_LENGTH]
+
+        # ... bookmark logic ...
+
+        return {
+            "ok": True,
+            "action": "added",
+            "bookmark": self._bookmark_to_response(bookmark)
+        }
+
+    except DuplicateKeyError:
+        # שגיאה ספציפית - מפתח כפול
+        return {
+            "ok": False,
+            "action": "error",
+            "error": "הסימנייה כבר קיימת"
+        }
+
+    except Exception as e:
+        # שגיאה כללית
+        logger.error(f"Error toggling bookmark: {e}", exc_info=True)
+        return {
+            "ok": False,
+            "action": "error",
+            "error": "שגיאה בשמירת הסימנייה"
+        }</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-7-3">
+          <div class="snippet-header">
+            <h3 class="snippet-title">7.3 Validation עם Error Messages</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> ולידציה עם החזרת tuple של (success, data, error_message).</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from typing import Tuple
+
+def validate_code_input(
+    code: str,
+    file_name: str,
+    user_id: int
+) -> Tuple[bool, str, str]:
+    """
+    בודק ומנקה קלט קוד.
+
+    Returns:
+        Tuple[bool, str, str]: (is_valid, cleaned_code, error_message)
+    """
+
+    # בדיקות בסיסיות
+    if not code or not code.strip():
+        return False, "", "הקוד ריק"
+
+    if len(code) > MAX_CODE_LENGTH:
+        return False, "", f"הקוד ארוך מדי (מקסימום {MAX_CODE_LENGTH} תווים)"
+
+    # ניקוי קוד
+    try:
+        cleaned = normalize_code(code)
+    except Exception as e:
+        return False, "", f"שגיאה בניקוי הקוד: {str(e)}"
+
+    # ולידציה נוספת אם יש
+    if code_processor:
+        ok, cleaned, msg = code_processor.validate_code_input(code, file_name, user_id)
+        if not ok:
+            return False, cleaned, msg
+
+    return True, cleaned, ""
+
+# שימוש:
+# is_valid, cleaned_code, error_msg = validate_code_input(code, filename, user_id)
+# if not is_valid:
+#     await update.message.reply_text(f"❌ {error_msg}")
+#     return
+# # המשך עם cleaned_code</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-7-4">
+          <div class="snippet-header">
+            <h3 class="snippet-title">7.4 Batch Processing עם Per-Item Errors</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> עיבוד batch שלא נעצר על שגיאה בודדת, אלא עוקב אחר הצלחות/כישלונות.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
+
+async def process_files_batch(
+    self,
+    job_id: str,
+    operation_func: Callable,
+    **kwargs
+) -> BatchJob:
+    """עיבוד batch של קבצים עם מעקב אחר שגיאות"""
+
+    if job_id not in self.active_jobs:
+        raise ValueError(f"עבודת batch {job_id} לא נמצאה")
+
+    job = self.active_jobs[job_id]
+    job.status = "running"
+    job.start_time = time.time()
+
+    try:
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            # יצירת futures לכל הקבצים
+            future_to_file = {
+                executor.submit(operation_func, job.user_id, file_name, **kwargs): file_name
+                for file_name in job.files
+            }
+
+            # עיבוד תוצאות עם מעקב אחר שגיאות
+            for future in as_completed(future_to_file):
+                file_name = future_to_file[future]
+
+                try:
+                    result = future.result()
+                    success_flag = True
+
+                    # בדיקת הצלחה
+                    if isinstance(result, dict):
+                        if 'is_valid' in result:
+                            success_flag = bool(result.get('is_valid'))
+                        elif 'error' in result:
+                            success_flag = False
+
+                    job.results[file_name] = {
+                        'success': success_flag,
+                        'result': result
+                    }
+
+                except Exception as e:
+                    # שגיאה בקובץ בודד - לא עוצרים
+                    job.results[file_name] = {
+                        'success': False,
+                        'error': str(e)
+                    }
+                    logger.error(f"שגיאה בעיבוד {file_name}: {e}")
+
+                job.progress += 1
+
+        # סיכום
+        job.status = "completed"
+        successful = sum(1 for r in job.results.values() if r['success'])
+        failed = job.total - successful
+
+        logger.info(f"עבודת batch {job_id} הושלמה: {successful} הצליחו, {failed} נכשלו")
+
+    except Exception as e:
+        job.status = "failed"
+        job.error_message = str(e)
+        logger.error(f"עבודת batch {job_id} נכשלה: {e}")
+
+    return job</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 8: בדיקות Pytest -->
+      <div class="category" id="category-8">
+        <div class="category-header">
+          <i class="fas fa-vial"></i>
+          <h2>בדיקות Pytest</h2>
+        </div>
+
+        <div class="snippet" id="snippet-8-1">
+          <div class="snippet-header">
+            <h3 class="snippet-title">8.1 Fixture עם Setup/Teardown</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> ניקוי סביבה לפני ואחרי כל בדיקה.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import pytest
+
+@pytest.fixture(autouse=True)
+def _clear_env(monkeypatch):
+    """ניקוי משתני סביבה לפני ואחרי כל בדיקה"""
+    # Setup
+    monkeypatch.delenv('WEBAPP_URL', raising=False)
+
+    yield  # הבדיקה רצה כאן
+
+    # Teardown
+    monkeypatch.delenv('WEBAPP_URL', raising=False)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-8-2">
+          <div class="snippet-header">
+            <h3 class="snippet-title">8.2 Test Parametrization</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> הרצת אותה בדיקה עם כמה סטים של נתונים.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import pytest
+import types
+
+@pytest.mark.parametrize(
+    "config_values, env_value, expected",
+    [
+        (
+            {"WEBAPP_URL": "https://cfg.example", "PUBLIC_BASE_URL": None},
+            None,
+            "https://cfg.example/file/abc"
+        ),
+        (
+            {"WEBAPP_URL": None, "PUBLIC_BASE_URL": "https://public.example"},
+            None,
+            "https://public.example/file/abc"
+        ),
+        (
+            {"WEBAPP_URL": None, "PUBLIC_BASE_URL": None},
+            "https://env.example",
+            "https://env.example/file/abc"
+        ),
+    ],
+)
+def test_file_view_webapp_button_prefers_available_source(
+    monkeypatch,
+    config_values,
+    env_value,
+    expected
+):
+    """בודק שהכפתור בוחר את המקור הנכון"""
+    import handlers.file_view as fv
+
+    # הגדרת config mock
+    stub_cfg = types.SimpleNamespace(**config_values)
+    monkeypatch.setattr(fv, 'config', stub_cfg, raising=False)
+
+    # הגדרת env אם נדרש
+    if env_value:
+        monkeypatch.setenv('WEBAPP_URL', env_value)
+
+    # הרצת הפונקציה
+    row = fv._get_webapp_button_row('abc', None)
+
+    # בדיקה
+    assert row[0].url == expected</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-8-3">
+          <div class="snippet-header">
+            <h3 class="snippet-title">8.3 Async Test</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> בדיקת פונקציות async עם aiohttp או asyncio.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import pytest
+from aiohttp import web
+import aiohttp
+
+@pytest.mark.asyncio
+async def test_health_endpoint_ok(monkeypatch):
+    """בודק שה-health endpoint עובד"""
+    from services.webserver import create_app
+
+    app = create_app()
+
+    # הרצת server זמני
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, host="127.0.0.1", port=0)
+    await site.start()
+
+    try:
+        # קבלת פורט דינמי
+        port = list(site._server.sockets)[0].getsockname()[1]
+
+        # שליחת request
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"http://127.0.0.1:{port}/health") as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert data.get("status") == "ok"
+
+    finally:
+        # ניקוי
+        await runner.cleanup()</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-8-4">
+          <div class="snippet-header">
+            <h3 class="snippet-title">8.4 Mocking עם MagicMock</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> החלפת dependencies עם mocks לבדיקה מבודדת.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from unittest.mock import MagicMock, Mock
+import unittest
+
+class TestBookmarks(unittest.TestCase):
+    def test_toggle_bookmark_add(self):
+        """בודק הוספת סימנייה חדשה"""
+
+        # הגדרת mocks
+        mock_collection = MagicMock()
+        mock_collection.find_one.return_value = None  # סימנייה לא קיימת
+        mock_collection.count_documents.return_value = 0
+        mock_collection.insert_one.return_value = Mock(inserted_id="new_id")
+
+        mock_db = MagicMock()
+        mock_db.file_bookmarks = mock_collection
+
+        manager = BookmarksManager(mock_db)
+
+        # הרצת הפונקציה
+        result = manager.toggle_bookmark(
+            user_id=123,
+            file_id="file123",
+            file_name="test.py",
+            file_path="/test.py",
+            line_number=42,
+            line_text="def test():",
+            note="Test bookmark"
+        )
+
+        # בדיקות
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["action"], "added")
+        self.assertIsNotNone(result["bookmark"])
+
+        # וידוא שהפונקציה נקראה
+        mock_collection.insert_one.assert_called_once()</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-8-5">
+          <div class="snippet-header">
+            <h3 class="snippet-title">8.5 Mocking עם @patch Decorator</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> החלפת מודולים שלמים או פונקציות בצורה נקייה.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from unittest.mock import patch, MagicMock
+import unittest
+
+class TestBookmarks(unittest.TestCase):
+
+    @patch('database.bookmarks_manager.logger')
+    def test_error_handling(self, mock_logger):
+        """בודק שהלוגים עובדים בשגיאות"""
+
+        # הגדרת mocks
+        mock_db = MagicMock()
+        mock_collection = MagicMock()
+        mock_db.file_bookmarks = mock_collection
+
+        # גורם לשגיאה
+        mock_collection.find_one.return_value = None
+        mock_collection.count_documents.return_value = 0
+        mock_collection.insert_one.side_effect = Exception("DB Error")
+
+        manager = BookmarksManager(mock_db)
+
+        # הרצת הפונקציה
+        result = manager.toggle_bookmark(
+            user_id=123,
+            file_id="file123",
+            file_name="test.py",
+            file_path="/test.py",
+            line_number=42
+        )
+
+        # בדיקות
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["action"], "error")
+
+        # וידוא שהשגיאה נרשמה
+        mock_logger.error.assert_called()</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 9: פונקציות עזר (Utility Functions) -->
+      <div class="category" id="category-9">
+        <div class="category-header">
+          <i class="fas fa-tools"></i>
+          <h2>פונקציות עזר</h2>
+        </div>
+
+        <div class="snippet" id="snippet-9-1">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.1 זמן יחסי בעברית (TimeUtils.format_relative_time)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> עוזר להציג למשתמשים כמה זמן עבר בשפה טבעית בעברית, עם טיפול חכם ביחידות זמן שונות.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">class TimeUtils:
+    """כלים לעבודה עם זמן ותאריכים"""
+    
+    @staticmethod
+    def format_relative_time(dt: datetime) -> str:
+        """פורמט זמן יחסי (לפני 5 דקות, אתמול וכו')"""
+        
+        now = datetime.now(timezone.utc) if dt.tzinfo else datetime.now()
+        diff = now - dt
+        
+        if diff.days > 365:
+            years = diff.days // 365
+            return f"לפני {years} שנ{'ה' if years == 1 else 'ים'}"
+        
+        elif diff.days > 30:
+            months = diff.days // 30
+            return f"לפני {months} חוד{'ש' if months == 1 else 'שים'}"
+        
+        elif diff.days > 7:
+            weeks = diff.days // 7
+            return f"לפני {weeks} שבוע{'ות' if weeks > 1 else ''}"
+        
+        elif diff.days > 0:
+            if diff.days == 1:
+                return "אתמול"
+            return f"לפני {diff.days} ימים"
+        
+        elif diff.seconds > 3600:
+            hours = diff.seconds // 3600
+            return f"לפני {hours} שע{'ה' if hours == 1 else 'ות'}"
+        
+        elif diff.seconds > 60:
+            minutes = diff.seconds // 60
+            return f"לפני {minutes} דק{'ה' if minutes == 1 else 'ות'}"
+        
+        else:
+            return "עכשיו"</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-2">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.2 אסקייפ ל-Markdown בטלגרם (TextUtils.escape_markdown)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מתאים כשצריך להציג טקסט גולמי בטלגרם בלי לשבור עיצוב Markdown V1/V2.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">class TextUtils:
+    """כלים לעבודה עם טקסט"""
+    
+    @staticmethod
+    def escape_markdown(text: str, version: int = 2) -> str:
+        """הגנה על תווים מיוחדים ב-Markdown"""
+        
+        if version == 2:
+            # Markdown V2: כל התווים שיש לאסקייפ לפי Telegram MarkdownV2
+            special_chars = set("_*[]()~`>#+-=|{}.!\\")
+            return "".join(("\\" + ch) if ch in special_chars else ch for ch in text)
+        else:
+            # Markdown V1: נשתמש בקבוצה מצומצמת אך גם נסמן סוגריים כדי להימנע מתקלות כלליות
+            special_chars = set("_*`[()\\")
+            return "".join(("\\" + ch) if ch in special_chars else ch for ch in text)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-3">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.3 ניקוי שמות קבצים (TextUtils.clean_filename)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מסיר תווים אסורים ומקצר שמות לפני שמירה בדיסק או העלאה לענן.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">class TextUtils:
+    """כלים לעבודה עם טקסט"""
+    
+    @staticmethod
+    def clean_filename(filename: str) -> str:
+        """ניקוי שם קובץ מתווים לא חוקיים"""
+        
+        # הסרת תווים לא חוקיים
+        cleaned = re.sub(r'[<>:"/\\|?*]', '_', filename)
+        
+        # הסרת רווחים מיותרים
+        cleaned = re.sub(r'\s+', '_', cleaned)
+        
+        # הסרת נקודות מיותרות
+        cleaned = re.sub(r'\.+', '.', cleaned)
+        
+        # הגבלת אורך
+        if len(cleaned) > 100:
+            name, ext = os.path.splitext(cleaned)
+            cleaned = name[:100-len(ext)] + ext
+        
+        return cleaned.strip('._')</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-4">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.4 מענה בטוח ל-CallbackQuery (TelegramUtils.safe_answer)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מבצע `query.answer` עם החרגה של שגיאות ידועות כדי לא להפיל את הזרימה.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">class TelegramUtils:
+    """כלים לעבודה עם Telegram"""
+    
+    @staticmethod
+    async def safe_answer(query, text: Optional[str] = None, show_alert: bool = False, cache_time: Optional[int] = None) -> None:
+        """מענה בטוח ל-CallbackQuery: מתעלם משגיאות 'Query is too old'/'query_id_invalid'."""
+        try:
+            kwargs: Dict[str, Any] = {}
+            if text is not None:
+                kwargs["text"] = text
+            if show_alert:
+                kwargs["show_alert"] = True
+            if cache_time is not None:
+                kwargs["cache_time"] = int(cache_time)
+            await query.answer(**kwargs)
+        except Exception as e:
+            msg = str(e).lower()
+            if "query is too old" in msg or "query_id_invalid" in msg or "message to edit not found" in msg:
+                return
+            raise</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-5">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.5 פיצול הודעות ארוכות (TelegramUtils.split_long_message)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> עוזר לפצל תשובה גדולה למקטעים בגבול 4096 תווים של טלגרם.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">class TelegramUtils:
+    """כלים לעבודה עם Telegram"""
+    
+    @staticmethod
+    def split_long_message(text: str, max_length: int = 4096) -> List[str]:
+        """חלוקת הודעה ארוכה לחלקים"""
+        
+        if len(text) <= max_length:
+            return [text]
+        
+        parts = []
+        current_part = ""
+        
+        for line in text.split('\n'):
+            if len(current_part) + len(line) + 1 <= max_length:
+                current_part += line + '\n'
+            else:
+                if current_part:
+                    parts.append(current_part.rstrip())
+                current_part = line + '\n'
+        
+        if current_part:
+            parts.append(current_part.rstrip())
+        
+        return parts</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-6">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.6 עריכת הודעה בטוחה (TelegramUtils.safe_edit_message_text)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מטפל גם במימושים סינכרוניים וגם אסינכרוניים ומדכא את שגיאת "message is not modified".</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">class TelegramUtils:
+    """כלים לעבודה עם Telegram"""
+    
+    @staticmethod
+    async def safe_edit_message_text(query, text: str, reply_markup=None, parse_mode: Optional[str] = None) -> None:
+        """עריכת טקסט הודעה בבטיחות: מתעלם משגיאת 'Message is not modified'.
+
+        תומך גם במימושי בדיקות שבהם `edit_message_text` היא פונקציה סינכרונית
+        שמחזירה `None` (לא awaitable), וגם במימושים אסינכרוניים רגילים.
+        """
+        try:
+            edit_func = getattr(query, "edit_message_text", None)
+            if not callable(edit_func):
+                return
+
+            kwargs = {"text": text, "reply_markup": reply_markup}
+            if parse_mode is not None:
+                kwargs["parse_mode"] = parse_mode
+
+            result = edit_func(**kwargs)
+
+            # אם חזר coroutine – צריך להמתין; אחרת זו פונקציה סינכרונית ואין מה להמתין
+            if asyncio.iscoroutine(result):
+                await result
+        except Exception as e:
+            msg = str(e).lower()
+            # התעלמות רק במקרה "not modified" (עמיד לשינויים קלים בטקסט)
+            if "not modified" in msg or "message is not modified" in msg:
+                return
+            raise</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-7">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.7 מניעת לחיצה כפולה (CallbackQueryGuard.should_block_async)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מונע הפעלה כפולה של אותו כפתור באמצעות נעילות פר-משתמש וחלון זמן קצר.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">class CallbackQueryGuard:
+    """Guard גורף ללחיצות כפולות על כפתורי CallbackQuery.
+    
+    מבוסס על טביעת אצבע של המשתמש/הודעה/הנתון (callback_data) כדי לחסום
+    את אותה פעולה בחלון זמן קצר, בלי לחסום פעולות שונות.
+    """
+
+    DEFAULT_WINDOW_SECONDS: float = 1.2
+    _user_locks: Dict[int, asyncio.Lock] = {}
+
+    @staticmethod
+    async def should_block_async(update: Update, context: ContextTypes.DEFAULT_TYPE, window_seconds: Optional[float] = None) -> bool:
+        """בודק בצורה אטומית (עם נעילה) אם לחסום לחיצה כפולה של אותו משתמש.
+
+        חסימה מבוססת חלון זמן פר-משתמש, ללא תלות ב-message_id/data, כדי למנוע מרוץ.
+        """
+        try:
+            try:
+                win = float(window_seconds if window_seconds is not None else CallbackQueryGuard.DEFAULT_WINDOW_SECONDS)
+            except Exception:
+                win = CallbackQueryGuard.DEFAULT_WINDOW_SECONDS
+
+            user_id = int(getattr(getattr(update, 'effective_user', None), 'id', 0) or 0)
+
+            # אם אין זיהוי משתמש, fallback להתנהגות הישנה ללא חסימה
+            if user_id <= 0:
+                return CallbackQueryGuard.should_block(update, context, window_seconds=win)
+
+            # קבל/צור נעילה למשתמש
+            lock = CallbackQueryGuard._user_locks.get(user_id)
+            if lock is None:
+                lock = asyncio.Lock()
+                CallbackQueryGuard._user_locks[user_id] = lock
+
+            async with lock:
+                now_ts = time.time()
+                # השתמש באותו שדה זמן גלובלי שהיה בשימוש, אך ללא טביעת אצבע
+                busy_until = float(context.user_data.get("_cb_guard_until", 0.0) or 0.0) if hasattr(context, "user_data") else 0.0
+                if now_ts < busy_until:
+                    return True
+                # סמנו חלון זמן חסימה חדש
+                if hasattr(context, "user_data"):
+                    context.user_data["_cb_guard_until"] = now_ts + win
+                return False
+        except Exception:
+            # אל תחסום אם guard נכשל
+            return False</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-8">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.8 עיבוד פריטים בקבוצות (AsyncUtils.batch_process)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מאפשר להריץ פעולות אסינכרוניות בקבוצות קטנות עם השהיה בין גושים.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">class AsyncUtils:
+    """כלים לעבודה אסינכרונית"""
+    
+    @staticmethod
+    async def batch_process(items: List[Any], process_func: Callable, 
+                           batch_size: int = 10, delay: float = 0.1) -> List[Any]:
+        """עיבוד פריטים בקבוצות"""
+        
+        results = []
+        
+        for i in range(0, len(items), batch_size):
+            batch = items[i:i + batch_size]
+            
+            # עיבוד הקבוצה
+            batch_tasks = [process_func(item) for item in batch]
+            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+            
+            results.extend(batch_results)
+            
+            # המתנה בין קבוצות
+            if delay > 0 and i + batch_size < len(items):
+                await asyncio.sleep(delay)
+        
+        return results</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-9">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.9 מדידת זמן עם context manager (PerformanceUtils.measure_time)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> נותן דרך קלה למדוד משך פעולה ולרשום אותו ללוג.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">class PerformanceUtils:
+    """כלים למדידת ביצועים"""
+    
+    @staticmethod
+    @contextmanager
+    def measure_time(operation_name: str):
+        """מדידת זמן עם context manager"""
+        
+        start_time = time.time()
+        try:
+            yield
+        finally:
+            execution_time = time.time() - start_time
+            logger.info(f"{operation_name}: {execution_time:.3f}s")</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-10">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.10 בדיקת קוד מסוכן (ValidationUtils.is_safe_code)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מספק בדיקת בטיחות בסיסית לקוד לפי שפה ומחזיר התראות אפשריות.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">class ValidationUtils:
+    """כלים לוולידציה"""
+    
+    @staticmethod
+    def is_safe_code(code: str, programming_language: str) -> Tuple[bool, List[str]]:
+        """בדיקה בסיסית של בטיחות קוד"""
+        
+        warnings = []
+        
+        # דפוסים מסוכנים
+        dangerous_patterns = {
+            'python': [
+                r'exec\s*\(',
+                r'eval\s*\(',
+                r'__import__\s*\(',
+                r'open\s*\([^)]*["\']w',  # כתיבה לקובץ
+                r'subprocess\.',
+                r'os\.system\s*\(',
+                r'os\.popen\s*\(',
+            ],
+            'javascript': [
+                r'eval\s*\(',
+                r'Function\s*\(',
+                r'document\.write\s*\(',
+                r'innerHTML\s*=',
+                r'outerHTML\s*=',
+            ],
+            'bash': [
+                r'rm\s+-rf',
+                r'rm\s+/',
+                r'dd\s+if=',
+                r'mkfs\.',
+                r'fdisk\s+',
+            ]
+        }
+        
+        if programming_language in dangerous_patterns:
+            for pattern in dangerous_patterns[programming_language]:
+                if re.search(pattern, code, re.IGNORECASE):
+                    warnings.append(f"דפוס מסוכן אפשרי: {pattern}")
+        
+        # בדיקות כלליות
+        if 'password' in code.lower() or 'secret' in code.lower():
+            warnings.append("הקוד מכיל מילות סיסמה או סוד")
+        
+        if re.search(r'https?://\S+', code):
+            warnings.append("הקוד מכיל URLים")
+        
+        is_safe = len(warnings) == 0
+        return is_safe, warnings</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 10: Background Jobs ו-RQ -->
+      <div class="category" id="category-10">
+        <div class="category-header">
+          <i class="fas fa-tasks"></i>
+          <h2>Background Jobs ו-RQ</h2>
+        </div>
+
+        <div class="snippet" id="snippet-10-1">
+          <div class="snippet-header">
+            <h3 class="snippet-title">10.1 RQ Job Definition עם Retry ו-Timeout</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> יצירת background job עם RQ כולל retry אוטומטי וטיימאאוט</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from rq import Retry
+from rq.decorators import job
+from app.core.cache import redis_queue_sync
+
+@job("default", timeout="10m", retry=Retry(max=3, interval=60), connection=redis_queue_sync)
+def process_new_report(report_id: str):
+    """
+    Process a newly submitted report.
+    
+    Args:
+        report_id: UUID string of the report to process
+    """
+    logger.info("Processing report", report_id=report_id)
+    
+    try:
+        # Run async code from sync job
+        return asyncio.run(_process_new_report_async(report_id))
+    except Exception as e:
+        logger.error("Failed to process report", report_id=report_id, error=str(e))
+        raise  # Re-raise for RQ retry mechanism</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-10-2">
+          <div class="snippet-header">
+            <h3 class="snippet-title">10.2 Enqueue or Run Inline Pattern</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> תמיכה ב-workers וגם במצב ללא workers (development)</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">def enqueue_or_run(func, *args, **kwargs):
+    """
+    Enqueue an RQ job when workers enabled, otherwise run inline.
+    
+    Example:
+        enqueue_or_run(process_new_report, report_id=str(report.id))
+    """
+    if settings.ENABLE_WORKERS:
+        # Production: Queue to RQ worker
+        return func.delay(*args, **kwargs)
+    else:
+        # Development: Run inline
+        if asyncio.iscoroutinefunction(func):
+            return asyncio.create_task(func(*args, **kwargs))
+        else:
+            return func(*args, **kwargs)</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 11: Telegram Bot Patterns -->
+      <div class="category" id="category-11">
+        <div class="category-header">
+          <i class="fas fa-robot"></i>
+          <h2>תבניות בוט טלגרם</h2>
+        </div>
+
+        <div class="snippet" id="snippet-11-1">
+          <div class="snippet-header">
+            <h3 class="snippet-title">11.1 Maintenance Mode Middleware</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מאפשר להכניס את הבוט למצב תחזוקה תוך שמירה על גישה לאדמינים.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-javascript"><code class="language-javascript">const isMaintenanceMode = () => {
+  return process.env.MAINTENANCE_MODE === 'true';
+};
+
+const isAdmin = (userId) => {
+  const admins = (process.env.ADMIN_USER_IDS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  return admins.includes(String(userId));
+};
+
+const maintenanceMiddleware = async (msg, next) => {
+  if (!isMaintenanceMode() || isAdmin(msg.from.id)) {
+    return next();
+  }
+
+  await bot.sendMessage(msg.chat.id,
+    '🔧 *הבוט במצב תחזוקה*\n\n' +
+    'אנחנו עושים שדרוג מהיר לבוט 🚀\n\n' +
+    'הכל יחזור לעבוד תוך כמה דקות.\n\n' +
+    'תודה על הסבלנות! 😊',
+    { parse_mode: 'Markdown' }
+  );
+  return false; // Block further processing
+};</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-11-2">
+          <div class="snippet-header">
+            <h3 class="snippet-title">11.2 Callback Query Router</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> ניתוב אוטומטי של callback queries לפי prefix, חוסך if-else ארוכים ומארגן את הקוד.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-javascript"><code class="language-javascript">async handleCallbackQuery(query) {
+  const chatId = query.message.chat.id;
+  const userId = query.from.id;
+  const data = query.data;
+  const messageId = query.message.message_id;
+
+  // Answer callback to remove loading state
+  await this.bot.answerCallbackQuery(query.id);
+
+  // Route based on callback data prefix
+  if (data.startsWith('pace_')) {
+    await this.handlePaceSelection(chatId, userId, data, messageId);
+  } else if (data.startsWith('answer_')) {
+    await this.handleQuizAnswer(chatId, userId, data, messageId);
+  } else if (data.startsWith('theme_')) {
+    await this.handleThemeSelection(chatId, userId, data, messageId);
+  } else if (data.startsWith('cheat_')) {
+    await this.handleCheatsheetTopic(chatId, userId, data, messageId);
+  } else if (data.startsWith('template_')) {
+    await this.handleTemplateSelection(chatId, userId, data);
+  }
+  // ... more routes
+}</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-11-3">
+          <div class="snippet-header">
+            <h3 class="snippet-title">11.3 Safe Send with Fallback</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> שליחת הודעות Markdown עם fallback אוטומטי לטקסט רגיל אם יש שגיאת parsing.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-javascript"><code class="language-javascript">async safeSendMarkdown(chatId, text, options = {}) {
+  try {
+    return await this.bot.sendMessage(chatId, text, { 
+      parse_mode: 'Markdown', 
+      ...options 
+    });
+  } catch (err) {
+    const desc = String(err?.response?.body?.description || err?.message || '').toLowerCase();
+    if (desc.includes("can't parse entities") || desc.includes('parse') || desc.includes('entity')) {
+      // Retry without parse mode
+      return await this.bot.sendMessage(chatId, text, { ...options });
+    }
+    throw err;
+  }
+}</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-11-4">
+          <div class="snippet-header">
+            <h3 class="snippet-title">11.4 Message Chunking (Split Long Messages)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> טלגרם מגביל הודעות ל-4096 תווים. תבנית זו מחלקת הודעות ארוכות לחתיכות תוך שמירה על קריאות.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-javascript"><code class="language-javascript">async sendLongMessage(chatId, text, options = {}) {
+  const maxLength = 4000; // Leave room for formatting
+  const chunks = [];
+  let currentChunk = '';
+  const lines = text.split('\n');
+
+  for (const line of lines) {
+    if ((currentChunk + line + '\n').length > maxLength) {
+      chunks.push(currentChunk);
+      currentChunk = line + '\n';
+    } else {
+      currentChunk += line + '\n';
+    }
+  }
+  if (currentChunk) chunks.push(currentChunk);
+
+  // Send each chunk
+  for (let i = 0; i < chunks.length; i++) {
+    await this.bot.sendMessage(chatId,
+      chunks.length > 1 ? `*חלק ${i + 1}/${chunks.length}*\n\n${chunks[i]}` : chunks[i],
+      { parse_mode: 'Markdown', ...options }
+    );
+    await this.sleep(500); // Small delay between messages
+  }
+}</code></pre>
+          </div>
+        </div>
       </div>
     </div>
   
