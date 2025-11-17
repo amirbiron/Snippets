@@ -1,21 +1,21 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl" data-theme="light"><head>
+<html lang="he" dir="rtl" data-theme="light" style=""><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ספריית Code Snippets המקיפה</title>
 
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&amp;family=Fira+Code:wght@300;400;500&amp;display=swap" rel="stylesheet" media="not all">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&amp;family=Fira+Code:wght@300;400;500&amp;display=swap" rel="stylesheet">
 
     <!-- Prism.js for syntax highlighting -->
-    <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css" rel="stylesheet" media="not all">
+    <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
 
     <!-- Icons -->
-    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" media="not all">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
 
-    <style media="not all">
+    <style>
       :root {
         --primary-color: #2d3748;
         --secondary-color: #4a5568;
@@ -242,18 +242,6 @@
 
       .snippet-content {
         position: relative;
-        padding: 1rem 1.5rem;
-      }
-
-      .snippet-content pre {
-        margin: 0;
-        padding: 1rem;
-        line-height: 1.6;
-        white-space: pre-wrap;
-        word-break: break-word;
-        background: var(--card-background);
-        border: 1px solid var(--border-color);
-        border-radius: 0.5rem;
       }
 
       .copy-button {
@@ -412,7 +400,7 @@
       }
     </style>
   </head>
-  <body>
+  <body style="">
     <!-- Header -->
     <div class="header">
       <div class="container">
@@ -595,7 +583,7 @@
 
       <!-- No results message -->
       <div class="no-results" id="noResults">
-        <i class="fas fa-search"></i>
+        <i class="fas fa-search" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5"></i>
         <h3>לא נמצאו תוצאות</h3>
         <p>נסה לחפש במילות מפתח אחרות או בדוק את האיות</p>
       </div>
@@ -8701,7 +8689,10 @@ job_queue.run_daily(daily_error_report, time=time(hour=9, minute=0))</code></pre
       </div>
     </div>
 
-    
+    <!-- Back to top button -->
+    <button class="back-to-top" id="backToTop" aria-label="חזרה למעלה">
+      <i class="fas fa-arrow-up"></i>
+    </button>
 
     <script src="scripts.js"></script>
   
