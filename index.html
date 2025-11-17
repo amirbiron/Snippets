@@ -403,6 +403,17 @@
       .container {
         padding-bottom: 96px;
       }
+
+      /* Fallback: if a code block escapes its snippet wrapper, render it card-like */
+      .container > pre[class*='language-'],
+      .category > pre[class*='language-'] {
+        background: #fff !important;
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        padding: 1rem 1.5rem;
+        box-shadow: var(--shadow);
+        margin-bottom: 1.5rem;
+      }
     </style>
   </head>
   <body style="">
