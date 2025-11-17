@@ -459,6 +459,15 @@
               <li><a href="#snippet-9-8">עיבוד פריטים בקבוצות</a></li>
               <li><a href="#snippet-9-9">מדידת זמן</a></li>
               <li><a href="#snippet-9-10">בדיקת קוד מסוכן</a></li>
+              <li><a href="#snippet-9-11">יצירת קובץ זמני</a></li>
+              <li><a href="#snippet-9-12">טעינת קובץ JSON</a></li>
+              <li><a href="#snippet-9-13">קאש זיכרון עם TTL</a></li>
+              <li><a href="#snippet-9-14">מסנן לוגים לרגישויות</a></li>
+              <li><a href="#snippet-9-15">נירמול ארגומנטים</a></li>
+              <li><a href="#snippet-9-16">קיצור טקסט באמצע</a></li>
+              <li><a href="#snippet-9-17">מעקב ביצועים עם Prometheus</a></li>
+              <li><a href="#snippet-9-18">הצעת השלמות לחיפוש</a></li>
+              <li><a href="#snippet-9-19">הדגשת טווחים בחיפוש</a></li>
             </ul>
           </div>
           <div class="toc-category">
@@ -466,6 +475,7 @@
             <ul class="toc-links">
               <li><a href="#snippet-10-1">RQ Job עם Retry</a></li>
               <li><a href="#snippet-10-2">Enqueue or Run Inline</a></li>
+              <li><a href="#snippet-10-3">RQ Scheduler – Recurring Jobs</a></li>
             </ul>
           </div>
           <div class="toc-category">
@@ -2506,6 +2516,287 @@ class TestBookmarks(unittest.TestCase):
         return is_safe, warnings</code></pre>
           </div>
         </div>
+
+        <div class="snippet" id="snippet-9-11">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.11 יצירת קובץ זמני (FileUtils.create_temp_file)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> יוצר קובץ זמני עם תוכן מחרוזת/בייטים ומחזיר את הנתיב לשימוש מיידי.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">class FileUtils:
+    """כלים לעבודה עם קבצים"""
+    
+    @staticmethod
+    async def create_temp_file(content: Union[str, bytes], 
+                              suffix: str = "") -> str:
+        """יצירת קובץ זמני"""
+        
+        with tempfile.NamedTemporaryFile(mode='wb', suffix=suffix, delete=False) as temp_file:
+            if isinstance(content, str):
+                content = content.encode('utf-8')
+            
+            temp_file.write(content)
+            return temp_file.name</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-12">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.12 טעינת קובץ JSON עם ברירת מחדל (ConfigUtils.load_json_config)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> נוח לקריאת קבצי הגדרות עם טיפול בשגיאות ולוג אזהרה אם הקובץ חסר.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">class ConfigUtils:
+    """כלים לקונפיגורציה"""
+    
+    @staticmethod
+    def load_json_config(file_path: str, default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """טעינת קונפיגורציה מקובץ JSON"""
+        
+        if default is None:
+            default = {}
+        
+        try:
+            if os.path.exists(file_path):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            else:
+                logger.warning(f"קובץ קונפיגורציה לא נמצא: {file_path}")
+                return default
+        
+        except Exception as e:
+            logger.error(f"שגיאה בטעינת קונפיגורציה: {e}")
+            return default</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-13">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.13 קאש זיכרון עם TTL (CacheUtils.set/get)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מאפשר לשמור ערכים בזיכרון לזמן קצוב ולהסירם אוטומטית כשהתוקף פג.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">class CacheUtils:
+    """כלים לקאש זמני"""
+    
+    _cache: Dict[str, Any] = {}
+    _cache_times: Dict[str, float] = {}
+    
+    @classmethod
+    def set(cls, key: str, value: Any, ttl: int = 300):
+        """שמירה בקאש עם TTL (שניות)"""
+        cls._cache[key] = value
+        cls._cache_times[key] = time.time() + ttl
+    
+    @classmethod
+    def get(cls, key: str, default: Any = None) -> Any:
+        """קבלה מהקאש"""
+        
+        if key not in cls._cache:
+            return default
+        
+        # בדיקת תפוגה
+        if time.time() > cls._cache_times.get(key, 0):
+            cls.delete(key)
+            return default
+        
+        return cls._cache[key]
+
+    @classmethod
+    def delete(cls, key: str):
+        """מחיקה מהקאש"""
+        cls._cache.pop(key, None)
+        cls._cache_times.pop(key, None)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-14">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.14 מסנן לוגים לרגישויות (SensitiveDataFilter)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מטשטש טוקנים חשופים בלוגים לפני שהם נכתבים החוצה.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">class SensitiveDataFilter(logging.Filter):
+    """מסנן שמטשטש טוקנים ונתונים רגישים בלוגים."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = str(record.getMessage())
+            # זיהוי בסיסי של טוקנים: ghp_..., github_pat_..., Bearer ...
+            patterns = [
+                (r"ghp_[A-Za-z0-9]{20,}", "ghp_***REDACTED***"),
+                (r"github_pat_[A-Za-z0-9_]{20,}", "github_pat_***REDACTED***"),
+                (r"Bearer\s+[A-Za-z0-9\-_.=:/+]{10,}", "Bearer ***REDACTED***"),
+            ]
+            redacted = msg
+            import re as _re
+            for pat, repl in patterns:
+                redacted = _re.sub(pat, repl, redacted)
+            # עדכן רק את message הפורמטי
+            record.msg = redacted
+            # חשוב: נקה ארגומנטים כדי למנוע ניסיון פורמט חוזר (%s) שיוביל ל-TypeError
+            record.args = ()
+        except Exception:
+            pass
+        return True</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-15">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.15 נירמול ארגומנטים לפקודות (_coerce_command_args)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מתאים כשצריך לקבל ארגומנטים מפקודת טלגרם ולתמוך במספר טיפוסים שונים.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">def _coerce_command_args(raw_args) -> List[str]:
+    """המרת args מסוגים שונים לרשימת מחרוזות נקייה."""
+    normalized: List[str] = []
+    if raw_args is None:
+        return normalized
+    try:
+        if isinstance(raw_args, (list, tuple, set)):
+            iterable = list(raw_args)
+        elif isinstance(raw_args, str):
+            iterable = [raw_args]
+        else:
+            try:
+                iterable = list(raw_args)
+            except TypeError:
+                iterable = [raw_args]
+    except Exception:
+        iterable = []
+    for arg in iterable:
+        if arg is None:
+            continue
+        if isinstance(arg, bytes):
+            try:
+                normalized.append(arg.decode("utf-8"))
+                continue
+            except Exception:
+                normalized.append(arg.decode("utf-8", "ignore"))
+                continue
+        normalized.append(str(arg))
+    return normalized</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-16">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.16 קיצור טקסט באמצע (_truncate_middle)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> נוח להצגת שמות קבצים או מזהים ארוכים תוך שמירה על ההתחלה והסוף.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">def _truncate_middle(text: str, max_len: int) -> str:
+    """מקצר מחרוזת באמצע עם אליפסיס אם חורגת מאורך נתון."""
+    if max_len <= 0:
+        return ''
+    if len(text) <= max_len:
+        return text
+    if max_len <= 1:
+        return text[:max_len]
+    keep = max_len - 1
+    front = keep // 2
+    back = keep - front
+    return text[:front] + '…' + text[-back:]</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-17">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.17 מעקב ביצועים עם Prometheus (track_performance)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> context manager שמזין Histogram של Prometheus בלי להפיל את השירות במקרה של שגיאת לייבלים.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">@contextmanager
+def track_performance(operation: str, labels: Optional[Dict[str, str]] = None):
+    start = time.time()
+    try:
+        yield
+    finally:
+        if operation_latency_seconds is not None:
+            try:
+                # בחר רק לייבלים שמוגדרים במטריקה ואל תאפשר דריסה של 'operation'
+                allowed = set(getattr(operation_latency_seconds, "_labelnames", []) or [])
+                target = {"operation": operation}
+                if labels:
+                    for k, v in labels.items():
+                        if k in allowed and k != "operation":
+                            target[k] = v
+                # ספק ערכי ברירת מחדל לכל לייבל חסר (למשל repo="") כדי לשמור תאימות לאחור
+                for name in allowed:
+                    if name not in target:
+                        if name == "operation":
+                            # כבר סופק לעיל
+                            continue
+                        # ברירת מחדל: מיתר סמנטיקה, מונע ValueError על חוסר בלייבל
+                        target[name] = ""
+                operation_latency_seconds.labels(**target).observe(time.time() - start)
+            except Exception:
+                # avoid breaking app on label mistakes
+                pass</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-18">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.18 הצעת השלמות לחיפוש גלובלי (fetchSuggestions)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> שולח בקשה אסינכרונית בצד הלקוח ומנתב התחברות מאולצת במקרה של 401.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-javascript"><code class="language-javascript">async function fetchSuggestions(q){
+  try{
+    const res = await fetch('/api/search/suggestions?q=' + encodeURIComponent(q), {
+      headers: { 'Accept': 'application/json' },
+      credentials: 'same-origin'
+    });
+
+    if (res.status === 401 || res.redirected) {
+      window.location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search + location.hash);
+      return;
+    }
+
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) { hideSuggestions(); return; }
+
+    const data = await res.json();
+    if (data && data.suggestions && data.suggestions.length){
+      showSuggestions(data.suggestions);
+    } else hideSuggestions();
+  } catch (e){ hideSuggestions(); }
+}</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-9-19">
+          <div class="snippet-header">
+            <h3 class="snippet-title">9.19 הדגשת טווחים בתוצאות חיפוש (highlightSnippet)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מקבל טקסט גולמי ומדגיש טווחים רלוונטיים עם `<mark>` מבלי לשבור HTML.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-javascript"><code class="language-javascript">function highlightSnippet(text, ranges){
+  text = String(text || '');
+  if (!ranges || !ranges.length) return escapeHtml(text);
+  const items = ranges.slice().sort((a,b)=> (a[0]-b[0]));
+  let out = '', last = 0;
+  for (const [s,e] of items){
+    if (s < last) continue;
+    out += escapeHtml(text.slice(last, s));
+    out += '<mark class="bg-warning">' + escapeHtml(text.slice(s, e)) + '</mark>';
+    last = e;
+  }
+  out += escapeHtml(text.slice(last));
+  return out;
+}</code></pre>
+          </div>
+        </div>
       </div>
 
       <!-- Category 10: Background Jobs ו-RQ -->
@@ -2568,6 +2859,40 @@ def process_new_report(report_id: str):
             return asyncio.create_task(func(*args, **kwargs))
         else:
             return func(*args, **kwargs)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-10-3">
+          <div class="snippet-header">
+            <h3 class="snippet-title">10.3 RQ Scheduler – Recurring Jobs</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> תזמון משימות חוזרות (cleanup, stats, sync)</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from rq_scheduler import Scheduler
+from app.core.cache import redis_queue_sync
+
+def schedule_recurring_jobs():
+    """Schedule recurring background jobs."""
+    scheduler = Scheduler(connection=redis_queue_sync)
+    
+    # Daily cleanup at 2 AM
+    scheduler.cron(
+        cron_string="0 2 * * *",  # Every day at 2 AM
+        func=cleanup_old_data,
+        timeout="30m",
+        use_local_timezone=False
+    )
+    
+    # Update stats every 6 hours
+    scheduler.cron(
+        cron_string="0 */6 * * *",
+        func=update_organization_stats,
+        timeout="10m",
+        use_local_timezone=False
+    )
+    
+    logger.info("Recurring jobs scheduled")</code></pre>
           </div>
         </div>
       </div>
