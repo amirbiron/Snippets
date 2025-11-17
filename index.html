@@ -359,7 +359,6 @@
         border: none;
         border-radius: 50%;
         cursor: pointer;
-        display: none;
         align-items: center;
         justify-content: center;
         font-size: 1.5rem;
@@ -367,12 +366,14 @@
         transition: all 0.3s ease;
         z-index: 1000;
         opacity: 0;
+        visibility: hidden;
         transform: translateY(20px);
+        display: flex;
       }
 
       .back-to-top.show {
-        display: flex;
         opacity: 1;
+        visibility: visible;
         transform: translateY(0);
       }
 
@@ -384,6 +385,16 @@
 
       .back-to-top:active {
         transform: translateY(-2px);
+      }
+
+      @media (max-width: 768px) {
+        .back-to-top {
+          bottom: 1rem;
+          left: 1rem;
+          width: 45px;
+          height: 45px;
+          font-size: 1.2rem;
+        }
       }
     </style>
   </head>
@@ -3804,46 +3815,75 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
     </button>
 
     <script>
-      // Copy code function
-      function copyCode(button) {
-        const codeBlock = button.nextElementSibling;
-        const code = codeBlock.querySelector('code');
-        
-        if (!code) return;
-        
-        // Get text content (remove HTML tags)
-        const text = code.innerText || code.textContent;
-        
-        // Copy to clipboard
-        navigator.clipboard.writeText(text).then(() => {
-          // Visual feedback
-          const originalText = button.textContent;
-          button.textContent = '✓ הועתק!';
-          button.classList.add('copy-success');
+      // Wait for DOM to be fully loaded
+      document.addEventListener('DOMContentLoaded', function() {
+        // Copy code function
+        function copyCode(button) {
+          const codeBlock = button.nextElementSibling;
+          const code = codeBlock.querySelector('code');
           
-          setTimeout(() => {
-            button.textContent = originalText;
-            button.classList.remove('copy-success');
-          }, 2000);
-        }).catch(err => {
-          // Fallback for older browsers
+          if (!code) return;
+          
+          // Get text content (remove HTML tags)
+          const text = code.innerText || code.textContent;
+          
+          // Copy to clipboard
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+              // Visual feedback
+              const originalText = button.textContent;
+              button.textContent = '✓ הועתק!';
+              button.classList.add('copy-success');
+              
+              setTimeout(() => {
+                button.textContent = originalText;
+                button.classList.remove('copy-success');
+              }, 2000);
+            }).catch(err => {
+              console.error('Failed to copy:', err);
+              fallbackCopy(text, button);
+            });
+          } else {
+            fallbackCopy(text, button);
+          }
+        }
+
+        // Fallback copy function for older browsers
+        function fallbackCopy(text, button) {
           const textArea = document.createElement('textarea');
           textArea.value = text;
           textArea.style.position = 'fixed';
+          textArea.style.top = '0';
+          textArea.style.left = '0';
+          textArea.style.width = '2em';
+          textArea.style.height = '2em';
+          textArea.style.padding = '0';
+          textArea.style.border = 'none';
+          textArea.style.outline = 'none';
+          textArea.style.boxShadow = 'none';
+          textArea.style.background = 'transparent';
           textArea.style.opacity = '0';
           document.body.appendChild(textArea);
+          textArea.focus();
           textArea.select();
           
           try {
-            document.execCommand('copy');
-            const originalText = button.textContent;
-            button.textContent = '✓ הועתק!';
-            button.classList.add('copy-success');
-            
-            setTimeout(() => {
-              button.textContent = originalText;
-              button.classList.remove('copy-success');
-            }, 2000);
+            const successful = document.execCommand('copy');
+            if (successful) {
+              const originalText = button.textContent;
+              button.textContent = '✓ הועתק!';
+              button.classList.add('copy-success');
+              
+              setTimeout(() => {
+                button.textContent = originalText;
+                button.classList.remove('copy-success');
+              }, 2000);
+            } else {
+              button.textContent = '❌ שגיאה';
+              setTimeout(() => {
+                button.textContent = 'העתק';
+              }, 2000);
+            }
           } catch (err) {
             console.error('Failed to copy:', err);
             button.textContent = '❌ שגיאה';
@@ -3853,95 +3893,112 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
           }
           
           document.body.removeChild(textArea);
-        });
-      }
+        }
 
-      // Search functionality
-      const searchInput = document.getElementById('searchInput');
-      const snippets = document.querySelectorAll('.snippet');
-      const categories = document.querySelectorAll('.category');
-      const noResults = document.getElementById('noResults');
+        // Make copyCode available globally
+        window.copyCode = copyCode;
 
-      if (searchInput) {
-        searchInput.addEventListener('input', function(e) {
-          const searchTerm = e.target.value.toLowerCase().trim();
-          let visibleCount = 0;
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        const snippets = document.querySelectorAll('.snippet');
+        const categories = document.querySelectorAll('.category');
+        const noResults = document.getElementById('noResults');
 
-          if (searchTerm === '') {
-            // Show all
+        if (searchInput && snippets.length > 0) {
+          searchInput.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            let visibleCount = 0;
+
+            if (searchTerm === '') {
+              // Show all
+              snippets.forEach(snippet => {
+                snippet.classList.remove('filtered-out');
+              });
+              categories.forEach(category => {
+                category.classList.remove('no-matches');
+              });
+              if (noResults) {
+                noResults.classList.remove('show');
+              }
+              return;
+            }
+
+            // Search in snippets
             snippets.forEach(snippet => {
-              snippet.classList.remove('filtered-out');
+              const title = snippet.querySelector('.snippet-title');
+              const description = snippet.querySelector('.snippet-description');
+              const code = snippet.querySelector('code');
+              
+              const titleText = title ? title.textContent.toLowerCase() : '';
+              const descText = description ? description.textContent.toLowerCase() : '';
+              const codeText = code ? (code.innerText || code.textContent || '').toLowerCase() : '';
+              
+              const matches = titleText.includes(searchTerm) || 
+                            descText.includes(searchTerm) || 
+                            codeText.includes(searchTerm);
+              
+              if (matches) {
+                snippet.classList.remove('filtered-out');
+                visibleCount++;
+              } else {
+                snippet.classList.add('filtered-out');
+              }
             });
+
+            // Hide categories with no visible snippets
             categories.forEach(category => {
-              category.classList.remove('no-matches');
+              const visibleSnippets = category.querySelectorAll('.snippet:not(.filtered-out)');
+              if (visibleSnippets.length === 0) {
+                category.classList.add('no-matches');
+              } else {
+                category.classList.remove('no-matches');
+              }
             });
-            noResults.classList.remove('show');
-            return;
-          }
 
-          // Search in snippets
-          snippets.forEach(snippet => {
-            const title = snippet.querySelector('.snippet-title')?.textContent.toLowerCase() || '';
-            const description = snippet.querySelector('.snippet-description')?.textContent.toLowerCase() || '';
-            const code = snippet.querySelector('code')?.textContent.toLowerCase() || '';
-            
-            const matches = title.includes(searchTerm) || 
-                          description.includes(searchTerm) || 
-                          code.includes(searchTerm);
-            
-            if (matches) {
-              snippet.classList.remove('filtered-out');
-              visibleCount++;
-            } else {
-              snippet.classList.add('filtered-out');
+            // Show/hide no results message
+            if (noResults) {
+              if (visibleCount === 0) {
+                noResults.classList.add('show');
+              } else {
+                noResults.classList.remove('show');
+              }
             }
           });
+        }
 
-          // Hide categories with no visible snippets
-          categories.forEach(category => {
-            const visibleSnippets = category.querySelectorAll('.snippet:not(.filtered-out)');
-            if (visibleSnippets.length === 0) {
-              category.classList.add('no-matches');
+        // Back to top button
+        const backToTopButton = document.getElementById('backToTop');
+        
+        if (backToTopButton) {
+          // Show/hide button based on scroll position
+          function handleScroll() {
+            if (window.pageYOffset > 300 || document.documentElement.scrollTop > 300) {
+              backToTopButton.classList.add('show');
             } else {
-              category.classList.remove('no-matches');
+              backToTopButton.classList.remove('show');
             }
-          });
-
-          // Show/hide no results message
-          if (visibleCount === 0) {
-            noResults.classList.add('show');
-          } else {
-            noResults.classList.remove('show');
           }
-        });
-      }
 
-      // Back to top button
-      const backToTopButton = document.getElementById('backToTop');
-      
-      // Show/hide button based on scroll position
-      window.addEventListener('scroll', function() {
-        if (window.pageYOffset > 300) {
-          backToTopButton.classList.add('show');
-        } else {
-          backToTopButton.classList.remove('show');
+          window.addEventListener('scroll', handleScroll);
+          
+          // Check initial scroll position
+          handleScroll();
+
+          // Smooth scroll to top
+          backToTopButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            window.scrollTo({
+              top: 0,
+              behavior: 'smooth'
+            });
+          });
+        }
+
+        // Initialize Prism.js highlighting
+        if (typeof Prism !== 'undefined') {
+          Prism.highlightAll();
         }
       });
-
-      // Smooth scroll to top
-      if (backToTopButton) {
-        backToTopButton.addEventListener('click', function() {
-          window.scrollTo({
-            top: 0,
-            behavior: 'smooth'
-          });
-        });
-      }
-
-      // Initialize Prism.js highlighting
-      if (typeof Prism !== 'undefined') {
-        Prism.highlightAll();
-      }
     </script>
   
 
