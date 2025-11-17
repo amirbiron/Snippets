@@ -363,18 +363,20 @@
         justify-content: center;
         font-size: 1.5rem;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        transition: all 0.3s ease;
+        transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
         z-index: 1000;
         opacity: 0;
         visibility: hidden;
         transform: translateY(20px);
         display: flex;
+        pointer-events: none;
       }
 
       .back-to-top.show {
-        opacity: 1;
-        visibility: visible;
-        transform: translateY(0);
+        opacity: 1 !important;
+        visibility: visible !important;
+        transform: translateY(0) !important;
+        pointer-events: auto;
       }
 
       .back-to-top:hover {
@@ -3816,95 +3818,165 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
 
     <script>
       // Wait for DOM to be fully loaded
-      document.addEventListener('DOMContentLoaded', function() {
-        // Copy code function
-        function copyCode(button) {
-          const codeBlock = button.nextElementSibling;
-          const code = codeBlock.querySelector('code');
-          
-          if (!code) return;
-          
-          // Get text content (remove HTML tags)
-          const text = code.innerText || code.textContent;
-          
-          // Copy to clipboard
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(() => {
-              // Visual feedback
-              const originalText = button.textContent;
-              button.textContent = '✓ הועתק!';
-              button.classList.add('copy-success');
-              
-              setTimeout(() => {
-                button.textContent = originalText;
-                button.classList.remove('copy-success');
-              }, 2000);
-            }).catch(err => {
-              console.error('Failed to copy:', err);
-              fallbackCopy(text, button);
-            });
-          } else {
-            fallbackCopy(text, button);
-          }
-        }
-
-        // Fallback copy function for older browsers
-        function fallbackCopy(text, button) {
-          const textArea = document.createElement('textarea');
-          textArea.value = text;
-          textArea.style.position = 'fixed';
-          textArea.style.top = '0';
-          textArea.style.left = '0';
-          textArea.style.width = '2em';
-          textArea.style.height = '2em';
-          textArea.style.padding = '0';
-          textArea.style.border = 'none';
-          textArea.style.outline = 'none';
-          textArea.style.boxShadow = 'none';
-          textArea.style.background = 'transparent';
-          textArea.style.opacity = '0';
-          document.body.appendChild(textArea);
-          textArea.focus();
-          textArea.select();
-          
+      (function() {
+        'use strict';
+        
+        // Make copyCode available globally immediately (before DOMContentLoaded)
+        window.copyCode = function(button) {
           try {
-            const successful = document.execCommand('copy');
-            if (successful) {
-              const originalText = button.textContent;
-              button.textContent = '✓ הועתק!';
-              button.classList.add('copy-success');
-              
-              setTimeout(() => {
-                button.textContent = originalText;
-                button.classList.remove('copy-success');
-              }, 2000);
+            // Find the parent snippet-content container
+            const snippetContent = button.closest('.snippet-content');
+            if (!snippetContent) {
+              console.error('Could not find snippet-content');
+              return;
+            }
+            
+            // Find the pre element (should be the next sibling of the button)
+            let preElement = button.nextElementSibling;
+            
+            // If next sibling is not PRE, try to find it
+            if (!preElement || preElement.tagName !== 'PRE') {
+              preElement = snippetContent.querySelector('pre');
+            }
+            
+            if (!preElement || preElement.tagName !== 'PRE') {
+              console.error('Could not find pre element');
+              return;
+            }
+            
+            // Find the code element inside the pre
+            const code = preElement.querySelector('code');
+            if (!code) {
+              console.error('Could not find code element');
+              return;
+            }
+            
+            // Get text content - use cloneNode to avoid affecting the original
+            const codeClone = code.cloneNode(true);
+            
+            // Remove all span elements (Prism.js syntax highlighting)
+            const spans = codeClone.querySelectorAll('span');
+            spans.forEach(span => {
+              const parent = span.parentNode;
+              while (span.firstChild) {
+                parent.insertBefore(span.firstChild, span);
+              }
+              parent.removeChild(span);
+            });
+            
+            // Get clean text content
+            let text = codeClone.textContent || codeClone.innerText || '';
+            
+            // Additional cleanup - remove any remaining HTML entities and script tags
+            text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+            text = text.replace(/&lt;script[^&]*&gt;[\s\S]*?&lt;\/script&gt;/gi, '');
+            text = text.trim();
+            
+            if (!text) {
+              console.error('No text to copy');
+              return;
+            }
+            
+            // Copy to clipboard
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(() => {
+                // Visual feedback
+                const originalText = button.textContent;
+                button.textContent = '✓ הועתק!';
+                button.classList.add('copy-success');
+                
+                setTimeout(() => {
+                  button.textContent = originalText;
+                  button.classList.remove('copy-success');
+                }, 2000);
+              }).catch(err => {
+                console.error('Failed to copy:', err);
+                fallbackCopyText(text, button);
+              });
             } else {
-              button.textContent = '❌ שגיאה';
-              setTimeout(() => {
-                button.textContent = 'העתק';
-              }, 2000);
+              fallbackCopyText(text, button);
             }
           } catch (err) {
-            console.error('Failed to copy:', err);
+            console.error('Error in copyCode:', err);
             button.textContent = '❌ שגיאה';
             setTimeout(() => {
               button.textContent = 'העתק';
             }, 2000);
           }
-          
-          document.body.removeChild(textArea);
+        };
+        
+        // Fallback copy function
+        function fallbackCopyText(text, button) {
+          try {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.top = '0';
+            textArea.style.left = '0';
+            textArea.style.width = '2em';
+            textArea.style.height = '2em';
+            textArea.style.padding = '0';
+            textArea.style.border = 'none';
+            textArea.style.outline = 'none';
+            textArea.style.boxShadow = 'none';
+            textArea.style.background = 'transparent';
+            textArea.style.opacity = '0';
+            textArea.style.zIndex = '-9999';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+              const successful = document.execCommand('copy');
+              if (successful) {
+                const originalText = button.textContent;
+                button.textContent = '✓ הועתק!';
+                button.classList.add('copy-success');
+                
+                setTimeout(() => {
+                  button.textContent = originalText;
+                  button.classList.remove('copy-success');
+                }, 2000);
+              } else {
+                button.textContent = '❌ שגיאה';
+                setTimeout(() => {
+                  button.textContent = 'העתק';
+                }, 2000);
+              }
+            } catch (err) {
+              console.error('execCommand failed:', err);
+              button.textContent = '❌ שגיאה';
+              setTimeout(() => {
+                button.textContent = 'העתק';
+              }, 2000);
+            }
+            
+            document.body.removeChild(textArea);
+          } catch (err) {
+            console.error('Fallback copy failed:', err);
+            button.textContent = '❌ שגיאה';
+            setTimeout(() => {
+              button.textContent = 'העתק';
+            }, 2000);
+          }
         }
-
-        // Make copyCode available globally
-        window.copyCode = copyCode;
-
+        
+        // Wait for DOM to be fully loaded for other functionality
+        document.addEventListener('DOMContentLoaded', function() {
         // Search functionality
         const searchInput = document.getElementById('searchInput');
         const snippets = document.querySelectorAll('.snippet');
         const categories = document.querySelectorAll('.category');
         const noResults = document.getElementById('noResults');
 
-        if (searchInput && snippets.length > 0) {
+        console.log('Search setup:', {
+          searchInput: !!searchInput,
+          snippetsCount: snippets.length,
+          categoriesCount: categories.length,
+          noResults: !!noResults
+        });
+
+        if (searchInput) {
           searchInput.addEventListener('input', function(e) {
             const searchTerm = e.target.value.toLowerCase().trim();
             let visibleCount = 0;
@@ -3931,7 +4003,20 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
               
               const titleText = title ? title.textContent.toLowerCase() : '';
               const descText = description ? description.textContent.toLowerCase() : '';
-              const codeText = code ? (code.innerText || code.textContent || '').toLowerCase() : '';
+              let codeText = '';
+              if (code) {
+                // Get text without HTML tags
+                const codeClone = code.cloneNode(true);
+                const spans = codeClone.querySelectorAll('span');
+                spans.forEach(span => {
+                  const parent = span.parentNode;
+                  while (span.firstChild) {
+                    parent.insertBefore(span.firstChild, span);
+                  }
+                  parent.removeChild(span);
+                });
+                codeText = (codeClone.textContent || codeClone.innerText || '').toLowerCase();
+              }
               
               const matches = titleText.includes(searchTerm) || 
                             descText.includes(searchTerm) || 
@@ -3964,6 +4049,11 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
               }
             }
           });
+          
+          // Test search on load
+          console.log('Search event listener attached');
+        } else {
+          console.warn('Search input not found');
         }
 
         // Back to top button
@@ -3972,14 +4062,22 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
         if (backToTopButton) {
           // Show/hide button based on scroll position
           function handleScroll() {
-            if (window.pageYOffset > 300 || document.documentElement.scrollTop > 300) {
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+            if (scrollTop > 300) {
               backToTopButton.classList.add('show');
             } else {
               backToTopButton.classList.remove('show');
             }
           }
 
-          window.addEventListener('scroll', handleScroll);
+          // Use throttled scroll handler for better performance
+          let scrollTimeout;
+          window.addEventListener('scroll', function() {
+            if (scrollTimeout) {
+              clearTimeout(scrollTimeout);
+            }
+            scrollTimeout = setTimeout(handleScroll, 10);
+          }, { passive: true });
           
           // Check initial scroll position
           handleScroll();
@@ -3987,17 +4085,21 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
           // Smooth scroll to top
           backToTopButton.addEventListener('click', function(e) {
             e.preventDefault();
+            e.stopPropagation();
             window.scrollTo({
               top: 0,
               behavior: 'smooth'
             });
           });
+        } else {
+          console.warn('Back to top button not found');
         }
 
         // Initialize Prism.js highlighting
         if (typeof Prism !== 'undefined') {
           Prism.highlightAll();
         }
+        })();
       });
     </script>
   
