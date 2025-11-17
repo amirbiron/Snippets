@@ -3914,7 +3914,8 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
     if b'<script' in file_data.lower() or b'javascript:' in file_data.lower():
         raise ValidationError("File contains potentially malicious content")</code></pre>
           </div>
-        </div>
+      </div>
+
       <!-- Category 17: Webhook Handling & Security -->
       <div class="category" id="category-17">
         <div class="category-header">
@@ -6200,104 +6201,6 @@ class UserRegistration(BaseModel):
         return v</code></pre>
           </div>
         </div>
-
-        <div class="snippet" id="snippet-28-3">
-          <div class="snippet-header">
-            <h3 class="snippet-title">28.3 Serialization Helpers</h3>
-            <p class="snippet-description">
-              <strong>למה זה שימושי:</strong> המרה נוחה בין פורמטים שונים
-            </p>
-          </div>
-          <div class="snippet-content">
-            <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python"><code class="language-python">from pydantic import BaseModel
-from typing import Any, Type, List
-import json
-from datetime import datetime, date
-from decimal import Decimal
-
-class EnhancedJSONEncoder(json.JSONEncoder):
-    """JSON encoder with support for datetime, Decimal, etc."""
-    def default(self, obj):
-        if isinstance(obj, (datetime, date)):
-            return obj.isoformat()
-        if isinstance(obj, Decimal):
-            return float(obj)
-        if isinstance(obj, BaseModel):
-            return obj.dict()
-        return super().default(obj)
-
-class SerializationHelper:
-    @staticmethod
-    def to_json(obj: Any, pretty: bool = False) -> str:
-        """Convert object to JSON string"""
-        indent = 2 if pretty else None
-        return json.dumps(obj, cls=EnhancedJSONEncoder, indent=indent)
-    
-    @staticmethod
-    def from_json(data: str, model: Type[BaseModel]) -> BaseModel:
-        """Parse JSON to Pydantic model"""
-        return model.parse_raw(data)
-    
-    @staticmethod
-    def batch_serialize(
-        items: List[BaseModel],
-        exclude_none: bool = True
-    ) -> List[dict]:
-        """Serialize list of models"""
-        return [
-            item.dict(exclude_none=exclude_none)
-            for item in items
-        ]
-    
-    @staticmethod
-    def nested_dict_to_model(
-        data: dict,
-        model: Type[BaseModel],
-        strict: bool = True
-    ) -> BaseModel:
-        """Convert nested dict to model with error handling"""
-        try:
-            return model.parse_obj(data)
-        except ValidationError as e:
-            if strict:
-                raise
-            # Return partial model with valid fields only
-            valid_data = {}
-            for field in model.__fields__:
-                if field in data:
-                    try:
-                        valid_data[field] = data[field]
-                    except:
-                        pass
-            return model.parse_obj(valid_data)
-
-# Usage
-class UserProfile(BaseModel):
-    id: int
-    name: str
-    email: str
-    created_at: datetime
-
-user = UserProfile(
-    id=1,
-    name="John",
-    email="john@example.com",
-    created_at=datetime.now()
-)
-
-# Serialize
-json_str = SerializationHelper.to_json(user, pretty=True)
-
-# Deserialize
-user_restored = SerializationHelper.from_json(json_str, UserProfile)
-
-# Batch operations
-users = [user, user2, user3]
-users_dict = SerializationHelper.batch_serialize(users)</code></pre>
-          </div>
-        </div>
-
       </div>
 
       </div>
