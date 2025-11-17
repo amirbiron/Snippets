@@ -3912,7 +3912,8 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
     
     # Check for malicious content
     if b'<script' in file_data.lower() or b'javascript:' in file_data.lower():
-        raise ValidationError("File contains potentially malicious content")</code></pre>
+        raise ValidationError("File contains potentially malicious content")
+</code></pre>
           </div>
       </div>
 
