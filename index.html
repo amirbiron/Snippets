@@ -4015,144 +4015,132 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
         
         // Wait for DOM to be fully loaded for other functionality
         document.addEventListener('DOMContentLoaded', function() {
-        // Search functionality
-        const searchInput = document.getElementById('searchInput');
-        const snippets = document.querySelectorAll('.snippet');
-        const categories = document.querySelectorAll('.category');
-        const noResults = document.getElementById('noResults');
+          // Search functionality
+          const searchInput = document.getElementById('searchInput');
+          const snippets = document.querySelectorAll('.snippet');
+          const categories = document.querySelectorAll('.category');
+          const noResults = document.getElementById('noResults');
 
-        console.log('Search setup:', {
-          searchInput: !!searchInput,
-          snippetsCount: snippets.length,
-          categoriesCount: categories.length,
-          noResults: !!noResults
-        });
+          if (searchInput) {
+            searchInput.addEventListener('input', function(e) {
+              const searchTerm = e.target.value.toLowerCase().trim();
+              let visibleCount = 0;
 
-        if (searchInput) {
-          searchInput.addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase().trim();
-            let visibleCount = 0;
-
-            if (searchTerm === '') {
-              // Show all
-              snippets.forEach(snippet => {
-                snippet.classList.remove('filtered-out');
-              });
-              categories.forEach(category => {
-                category.classList.remove('no-matches');
-              });
-              if (noResults) {
-                noResults.classList.remove('show');
-              }
-              return;
-            }
-
-            // Search in snippets
-            snippets.forEach(snippet => {
-              const title = snippet.querySelector('.snippet-title');
-              const description = snippet.querySelector('.snippet-description');
-              const code = snippet.querySelector('code');
-              
-              const titleText = title ? title.textContent.toLowerCase() : '';
-              const descText = description ? description.textContent.toLowerCase() : '';
-              let codeText = '';
-              if (code) {
-                // Get text without HTML tags
-                const codeClone = code.cloneNode(true);
-                const spans = codeClone.querySelectorAll('span');
-                spans.forEach(span => {
-                  const parent = span.parentNode;
-                  while (span.firstChild) {
-                    parent.insertBefore(span.firstChild, span);
-                  }
-                  parent.removeChild(span);
+              if (searchTerm === '') {
+                // Show all
+                snippets.forEach(snippet => {
+                  snippet.classList.remove('filtered-out');
                 });
-                codeText = (codeClone.textContent || codeClone.innerText || '').toLowerCase();
+                categories.forEach(category => {
+                  category.classList.remove('no-matches');
+                });
+                if (noResults) {
+                  noResults.classList.remove('show');
+                }
+                return;
               }
-              
-              const matches = titleText.includes(searchTerm) || 
-                            descText.includes(searchTerm) || 
-                            codeText.includes(searchTerm);
-              
-              if (matches) {
-                snippet.classList.remove('filtered-out');
-                visibleCount++;
-              } else {
-                snippet.classList.add('filtered-out');
+
+              // Search in snippets
+              snippets.forEach(snippet => {
+                const title = snippet.querySelector('.snippet-title');
+                const description = snippet.querySelector('.snippet-description');
+                const code = snippet.querySelector('code');
+                
+                const titleText = title ? title.textContent.toLowerCase() : '';
+                const descText = description ? description.textContent.toLowerCase() : '';
+                let codeText = '';
+                if (code) {
+                  // Get text without HTML tags
+                  const codeClone = code.cloneNode(true);
+                  const spans = codeClone.querySelectorAll('span');
+                  spans.forEach(span => {
+                    const parent = span.parentNode;
+                    if (parent) {
+                      while (span.firstChild) {
+                        parent.insertBefore(span.firstChild, span);
+                      }
+                      parent.removeChild(span);
+                    }
+                  });
+                  codeText = (codeClone.textContent || codeClone.innerText || '').toLowerCase();
+                }
+                
+                const matches = titleText.includes(searchTerm) || 
+                              descText.includes(searchTerm) || 
+                              codeText.includes(searchTerm);
+                
+                if (matches) {
+                  snippet.classList.remove('filtered-out');
+                  visibleCount++;
+                } else {
+                  snippet.classList.add('filtered-out');
+                }
+              });
+
+              // Hide categories with no visible snippets
+              categories.forEach(category => {
+                const visibleSnippets = category.querySelectorAll('.snippet:not(.filtered-out)');
+                if (visibleSnippets.length === 0) {
+                  category.classList.add('no-matches');
+                } else {
+                  category.classList.remove('no-matches');
+                }
+              });
+
+              // Show/hide no results message
+              if (noResults) {
+                if (visibleCount === 0) {
+                  noResults.classList.add('show');
+                } else {
+                  noResults.classList.remove('show');
+                }
               }
             });
-
-            // Hide categories with no visible snippets
-            categories.forEach(category => {
-              const visibleSnippets = category.querySelectorAll('.snippet:not(.filtered-out)');
-              if (visibleSnippets.length === 0) {
-                category.classList.add('no-matches');
-              } else {
-                category.classList.remove('no-matches');
-              }
-            });
-
-            // Show/hide no results message
-            if (noResults) {
-              if (visibleCount === 0) {
-                noResults.classList.add('show');
-              } else {
-                noResults.classList.remove('show');
-              }
-            }
-          });
-          
-          // Test search on load
-          console.log('Search event listener attached');
-        } else {
-          console.warn('Search input not found');
-        }
-
-        // Back to top button
-        const backToTopButton = document.getElementById('backToTop');
-        
-        if (backToTopButton) {
-          // Show/hide button based on scroll position
-          function handleScroll() {
-            const scrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-            if (scrollTop > 300) {
-              backToTopButton.classList.add('show');
-            } else {
-              backToTopButton.classList.remove('show');
-            }
           }
 
-          // Use throttled scroll handler for better performance
-          let scrollTimeout;
-          window.addEventListener('scroll', function() {
-            if (scrollTimeout) {
-              clearTimeout(scrollTimeout);
-            }
-            scrollTimeout = setTimeout(handleScroll, 10);
-          }, { passive: true });
+          // Back to top button
+          const backToTopButton = document.getElementById('backToTop');
           
-          // Check initial scroll position
-          handleScroll();
+          if (backToTopButton) {
+            // Show/hide button based on scroll position
+            function handleScroll() {
+              const scrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+              if (scrollTop > 300) {
+                backToTopButton.classList.add('show');
+              } else {
+                backToTopButton.classList.remove('show');
+              }
+            }
 
-          // Smooth scroll to top
-          backToTopButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            window.scrollTo({
-              top: 0,
-              behavior: 'smooth'
+            // Use throttled scroll handler for better performance
+            let scrollTimeout;
+            window.addEventListener('scroll', function() {
+              if (scrollTimeout) {
+                clearTimeout(scrollTimeout);
+              }
+              scrollTimeout = setTimeout(handleScroll, 10);
+            }, { passive: true });
+            
+            // Check initial scroll position
+            handleScroll();
+
+            // Smooth scroll to top
+            backToTopButton.addEventListener('click', function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+              });
             });
-          });
-        } else {
-          console.warn('Back to top button not found');
-        }
+          }
 
-        // Initialize Prism.js highlighting
-        if (typeof Prism !== 'undefined') {
-          Prism.highlightAll();
-        }
-        })();
-      });
+          // Initialize Prism.js highlighting
+          if (typeof Prism !== 'undefined') {
+            Prism.highlightAll();
+          }
+        });
+      })();
     </script>
   
 
