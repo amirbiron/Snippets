@@ -485,6 +485,45 @@
               <li><a href="#snippet-11-2">Callback Query Router</a></li>
               <li><a href="#snippet-11-3">Safe Send עם Fallback</a></li>
               <li><a href="#snippet-11-4">Message Chunking</a></li>
+              <li><a href="#snippet-11-5">User Mode Management</a></li>
+              <li><a href="#snippet-11-6">Progress Bar Generation</a></li>
+              <li><a href="#snippet-11-7">Multi-Step Form Flow</a></li>
+            </ul>
+          </div>
+          <div class="toc-category">
+            <h3><i class="fas fa-database"></i> Database Async</h3>
+            <ul class="toc-links">
+              <li><a href="#snippet-12-1">Async Session Manager</a></li>
+              <li><a href="#snippet-12-2">Eager Loading</a></li>
+              <li><a href="#snippet-12-3">Complex Filter</a></li>
+              <li><a href="#snippet-12-4">Transaction Pattern</a></li>
+              <li><a href="#snippet-12-5">Upsert Pattern</a></li>
+            </ul>
+          </div>
+          <div class="toc-category">
+            <h3><i class="fas fa-shield-alt"></i> Authentication</h3>
+            <ul class="toc-links">
+              <li><a href="#snippet-13-1">JWT Token Creation</a></li>
+              <li><a href="#snippet-13-2">JWT Validation</a></li>
+              <li><a href="#snippet-13-3">Role-Based Access</a></li>
+            </ul>
+          </div>
+          <div class="toc-category">
+            <h3><i class="fas fa-memory"></i> Redis & Caching</h3>
+            <ul class="toc-links">
+              <li><a href="#snippet-14-1">Distributed Lock</a></li>
+            </ul>
+          </div>
+          <div class="toc-category">
+            <h3><i class="fas fa-heartbeat"></i> Health Checks</h3>
+            <ul class="toc-links">
+              <li><a href="#snippet-15-1">Comprehensive Health Check</a></li>
+            </ul>
+          </div>
+          <div class="toc-category">
+            <h3><i class="fas fa-file-upload"></i> File Storage</h3>
+            <ul class="toc-links">
+              <li><a href="#snippet-16-1">File Validation</a></li>
             </ul>
           </div>
         </div>
@@ -3030,6 +3069,691 @@ const maintenanceMiddleware = async (msg, next) => {
     await this.sleep(500); // Small delay between messages
   }
 }</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-11-5">
+          <div class="snippet-header">
+            <h3 class="snippet-title">11.5 User Mode Management (State Machine)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> ניהול מצבי משתמש (sandbox, training, submitting_template) עם נתונים JSON. מאפשר זרימות מורכבות.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-javascript"><code class="language-javascript">// Database schema:
+// CREATE TABLE user_modes (
+//   user_id INTEGER PRIMARY KEY,
+//   current_mode TEXT DEFAULT 'normal',
+//   mode_data TEXT,  -- JSON string
+//   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+// )
+
+getUserMode(userId) {
+  const stmt = this.db.prepare('SELECT * FROM user_modes WHERE user_id = ?');
+  let mode = stmt.get(userId);
+  
+  if (!mode) {
+    const insertStmt = this.db.prepare(`
+      INSERT INTO user_modes (user_id, current_mode)
+      VALUES (?, 'normal')
+    `);
+    insertStmt.run(userId);
+    mode = { user_id: userId, current_mode: 'normal', mode_data: null };
+  }
+  
+  return mode;
+}
+
+setUserMode(userId, mode, modeData = null) {
+  const stmt = this.db.prepare(`
+    INSERT OR REPLACE INTO user_modes (user_id, current_mode, mode_data, updated_at)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+  `);
+  stmt.run(userId, mode, modeData ? JSON.stringify(modeData) : null);
+}
+
+clearUserMode(userId) {
+  this.setUserMode(userId, 'normal', null);
+}
+
+// שימוש:
+const mode = this.db.getUserMode(userId);
+if (mode.current_mode === 'sandbox') {
+  await this.handleSandboxInput(chatId, userId, text);
+} else if (mode.current_mode === 'training') {
+  const modeData = JSON.parse(mode.mode_data);
+  await this.handleTrainingAnswer(chatId, userId, text, modeData);
+}</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-11-6">
+          <div class="snippet-header">
+            <h3 class="snippet-title">11.6 Progress Bar Generation</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> יצירת progress bar טקסטואלי יפה להודעות טלגרם, שימושי להצגת התקדמות.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-javascript"><code class="language-javascript">createProgressBar(current, total, barLength = 10) {
+  const filledBars = Math.floor((current / total) * barLength);
+  const emptyBars = barLength - filledBars;
+  return '█'.repeat(filledBars) + '░'.repeat(emptyBars);
+}
+
+// שימוש:
+const progress = this.db.getUserProgress(userId);
+const totalLessons = 14;
+const progressBar = this.createProgressBar(
+  progress.lessons_completed,
+  totalLessons,
+  10
+);
+const message = `📈 *התקדמות בשיעורים:*\n${progressBar} ${progressPercentage}%\n${progress.lessons_completed}/${totalLessons} שיעורים הושלמו`;</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-11-7">
+          <div class="snippet-header">
+            <h3 class="snippet-title">11.7 Multi-Step Form Flow</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> זרימת הגשת תבניות/טפסים רב-שלבית. שימושי לשאלונים, הרשמות, והגשות.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-javascript"><code class="language-javascript">// שלב 1: התחלה
+async handleSubmitTemplate(msg) {
+  const userId = msg.from.id;
+  this.db.setUserMode(userId, 'submitting_template', JSON.stringify({ step: 'title' }));
+  
+  await this.bot.sendMessage(chatId,
+    '📝 *שלב 1 מתוך 4: כותרת*\n' +
+    'מה שם התבנית?',
+    { parse_mode: 'Markdown' }
+  );
+}
+
+// שלב 2: טיפול בקלט
+async handleTemplateSubmissionInput(chatId, userId, text, mode) {
+  const modeData = JSON.parse(mode.mode_data || '{}');
+  const step = modeData.step;
+
+  if (step === 'title') {
+    // Validate
+    if (text.length < 3 || text.length > 100) {
+      await this.bot.sendMessage(chatId, '❌ הכותרת צריכה להיות בין 3 ל-100 תווים.');
+      return;
+    }
+
+    // Save and advance
+    modeData.title = text;
+    modeData.step = 'category';
+    this.db.setUserMode(userId, 'submitting_template', JSON.stringify(modeData));
+
+    await this.bot.sendMessage(chatId,
+      `✅ כותרת נשמרה: "${text}"\n\n` +
+      `📝 *שלב 2 מתוך 4: קטגוריה*`,
+      { parse_mode: 'Markdown' }
+    );
+  } else if (step === 'category') {
+    // ... continue flow
+  } else if (step === 'content') {
+    // Final step - save and complete
+    this.db.createTemplateSubmission(userId, templateId, modeData.title, ...);
+    this.db.clearUserMode(userId);
+    await this.bot.sendMessage(chatId, '🎉 תבנית נשלחה בהצלחה!');
+  }
+}</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 12: Database Async Patterns -->
+      <div class="category" id="category-12">
+        <div class="category-header">
+          <i class="fas fa-database"></i>
+          <h2>Database Async Patterns (SQLAlchemy)</h2>
+        </div>
+
+        <div class="snippet" id="snippet-12-1">
+          <div class="snippet-header">
+            <h3 class="snippet-title">12.1 Async Database Session Context Manager</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> ניהול session אוטומטי עם סגירה בטוחה</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+# Create async engine
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    pool_size=settings.DATABASE_POOL_SIZE,
+    max_overflow=settings.DATABASE_MAX_OVERFLOW,
+    pool_timeout=settings.DATABASE_POOL_TIMEOUT,
+    echo=settings.DATABASE_ECHO,
+    pool_pre_ping=True,  # Validate connections before use
+    pool_recycle=3600,   # Recycle connections every hour
+)
+
+# Create session factory
+async_session_maker = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+)
+
+# Usage in code
+async def some_database_operation():
+    async with async_session_maker() as session:
+        result = await session.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        
+        # Modify user
+        user.last_login_at = datetime.now(timezone.utc)
+        
+        await session.commit()
+        await session.refresh(user)
+        
+        return user</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-12-2">
+          <div class="snippet-header">
+            <h3 class="snippet-title">12.2 Eager Loading עם selectinload</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> טעינת relationships בשאילתה אחת למניעת N+1</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from sqlalchemy.orm import selectinload
+
+async def get_report_with_relations(report_id: uuid.UUID, session: AsyncSession):
+    """Get report with all related data loaded."""
+    
+    query = select(Report).where(Report.id == report_id).options(
+        selectinload(Report.reporter),              # Load reporter user
+        selectinload(Report.files),                 # Load files
+        selectinload(Report.alerts).selectinload(Alert.organization),  # Nested load
+        selectinload(Report.assigned_organization)
+    )
+    
+    result = await session.execute(query)
+    report = result.scalar_one_or_none()
+    
+    return report</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-12-3">
+          <div class="snippet-header">
+            <h3 class="snippet-title">12.3 Complex Filter עם and_ / or_</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> בניית שאילתות מורכבות עם תנאים מרובים</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from sqlalchemy import select, and_, or_, desc
+
+async def search_reports(
+    session: AsyncSession,
+    animal_type: Optional[AnimalType] = None,
+    urgency_level: Optional[UrgencyLevel] = None,
+    city: Optional[str] = None,
+    date_from: Optional[datetime] = None,
+    status_list: Optional[List[ReportStatus]] = None
+):
+    """Search reports with multiple filters."""
+    
+    # Build conditions list
+    conditions = []
+    
+    if animal_type:
+        conditions.append(Report.animal_type == animal_type)
+    
+    if urgency_level:
+        conditions.append(Report.urgency_level == urgency_level)
+    
+    if city:
+        conditions.append(Report.city.ilike(f"%{city}%"))
+    
+    if date_from:
+        conditions.append(Report.created_at >= date_from)
+    
+    if status_list:
+        conditions.append(Report.status.in_(status_list))
+    
+    # Combine all conditions with AND
+    query = select(Report)
+    if conditions:
+        query = query.where(and_(*conditions))
+    
+    # Order by created_at descending
+    query = query.order_by(desc(Report.created_at))
+    
+    result = await session.execute(query)
+    reports = result.scalars().all()
+    
+    return reports</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-12-4">
+          <div class="snippet-header">
+            <h3 class="snippet-title">12.4 Database Transaction Pattern</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> ביצוע מספר פעולות DB כטרנזקציה אטומית. מבטיח עקביות נתונים.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-javascript"><code class="language-javascript">resetUserProgress(userId) {
+  const trx = this.db.transaction((uid) => {
+    // Reset core progress fields
+    const resetStmt = this.db.prepare(`
+      UPDATE user_progress
+      SET current_lesson = 0,
+          total_score = 0,
+          level = 'Beginner',
+          lessons_completed = 0,
+          correct_answers = 0,
+          wrong_answers = 0,
+          last_lesson_date = NULL
+      WHERE user_id = ?
+    `);
+    resetStmt.run(uid);
+
+    // Clear lesson history and topic performance
+    const delHistory = this.db.prepare('DELETE FROM lesson_history WHERE user_id = ?');
+    delHistory.run(uid);
+    const delTopics = this.db.prepare('DELETE FROM topic_performance WHERE user_id = ?');
+    delTopics.run(uid);
+
+    // Reset user mode to normal
+    const resetMode = this.db.prepare(`
+      INSERT OR REPLACE INTO user_modes (user_id, current_mode, mode_data, updated_at)
+      VALUES (?, 'normal', NULL, CURRENT_TIMESTAMP)
+    `);
+    resetMode.run(uid);
+  });
+
+  trx(userId);
+}</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-12-5">
+          <div class="snippet-header">
+            <h3 class="snippet-title">12.5 Upsert with ON CONFLICT</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> עדכון או הוספת רשומה בקריאה אחת. שימושי למעקב ביצועים, העדפות משתמש.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-javascript"><code class="language-javascript">updateTopicPerformance(userId, topic, isCorrect) {
+  const field = isCorrect ? 'correct_count' : 'wrong_count';
+  
+  const stmt = this.db.prepare(`
+    INSERT INTO topic_performance (user_id, topic, ${field}, last_practiced)
+    VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+    ON CONFLICT(user_id, topic) DO UPDATE SET
+      ${field} = ${field} + 1,
+      last_practiced = CURRENT_TIMESTAMP
+  `);
+  
+  stmt.run(userId, topic);
+}</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 13: Authentication & Security -->
+      <div class="category" id="category-13">
+        <div class="category-header">
+          <i class="fas fa-shield-alt"></i>
+          <h2>Authentication & Security</h2>
+        </div>
+
+        <div class="snippet" id="snippet-13-1">
+          <div class="snippet-header">
+            <h3 class="snippet-title">13.1 JWT Token Creation</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> יצירת JWT tokens מאובטחים</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import jwt
+from datetime import datetime, timezone, timedelta
+
+def create_access_token(
+    subject: Union[str, int],
+    expires_delta: Optional[timedelta] = None,
+    additional_claims: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    Create JWT access token.
+    
+    Example:
+        token = create_access_token(
+            subject=str(user.id),
+            expires_delta=timedelta(days=7),
+            additional_claims={"role": user.role.value}
+        )
+    """
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(days=7)
+    
+    to_encode = {
+        "exp": expire,
+        "sub": str(subject),
+        "iat": datetime.now(timezone.utc),
+        "type": "access",
+    }
+    
+    if additional_claims:
+        to_encode.update(additional_claims)
+    
+    encoded_jwt = jwt.encode(
+        to_encode,
+        settings.SECRET_KEY,
+        algorithm="HS256"
+    )
+    
+    return encoded_jwt</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-13-2">
+          <div class="snippet-header">
+            <h3 class="snippet-title">13.2 JWT Token Validation Dependency</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> אימות אוטומטי של משתמש מ-JWT</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer()
+
+async def get_current_user(
+    session: AsyncSession = Depends(get_db_session),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
+) -> Optional[User]:
+    """
+    Get current authenticated user from JWT token.
+    
+    Usage:
+        @app.get("/protected")
+        async def protected_route(user: User = Depends(get_current_user)):
+            return {"user_id": str(user.id)}
+    """
+    if not credentials:
+        return None
+    
+    try:
+        # Decode token
+        payload = jwt.decode(
+            credentials.credentials,
+            settings.SECRET_KEY,
+            algorithms=["HS256"]
+        )
+        
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        
+        # Get user from database
+        result = await session.execute(
+            select(User).where(User.id == uuid.UUID(user_id))
+        )
+        user = result.scalar_one_or_none()
+        
+        if not user or not user.is_active:
+            return None
+        
+        # Update last activity
+        user.last_login_at = datetime.now(timezone.utc)
+        await session.commit()
+        
+        return user
+    
+    except Exception as e:
+        logger.debug("Authentication failed", error=str(e))
+        return None</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-13-3">
+          <div class="snippet-header">
+            <h3 class="snippet-title">13.3 Role-Based Access Control</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> הגבלת גישה לפי תפקידים</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">def require_roles(allowed_roles: List[UserRole]):
+    """
+    Create dependency that requires specific roles.
+    
+    Usage:
+        @app.post("/admin/action")
+        async def admin_action(
+            user: User = Depends(require_roles([UserRole.SYSTEM_ADMIN]))
+        ):
+            return {"status": "ok"}
+    """
+    async def role_checker(current_user: User = Depends(get_current_user)) -> User:
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required"
+            )
+        
+        if current_user.role not in allowed_roles:
+            logger.warning(
+                "Access denied",
+                user_id=str(current_user.id),
+                user_role=current_user.role.value,
+                required_roles=[r.value for r in allowed_roles]
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions"
+            )
+        
+        return current_user
+    
+    return role_checker</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 14: Redis & Caching -->
+      <div class="category" id="category-14">
+        <div class="category-header">
+          <i class="fas fa-memory"></i>
+          <h2>Redis & Caching</h2>
+        </div>
+
+        <div class="snippet" id="snippet-14-1">
+          <div class="snippet-header">
+            <h3 class="snippet-title">14.1 Distributed Lock עם Redis</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> נעילה מבוזרת למניעת race conditions</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from contextlib import asynccontextmanager
+
+class DistributedLock:
+    """Redis-based distributed lock."""
+    
+    def __init__(self, key: str, timeout: int = 30):
+        self.key = f"lock:{key}"
+        self.timeout = timeout
+        self.identifier = f"{id(self)}:{time.time()}"
+        self._acquired = False
+    
+    async def acquire(self) -> bool:
+        """Acquire the lock."""
+        result = await redis_client.set(
+            self.key,
+            self.identifier,
+            nx=True,  # Only set if doesn't exist
+            ex=self.timeout  # Expiration
+        )
+        self._acquired = bool(result)
+        return self._acquired
+    
+    async def release(self) -> bool:
+        """Release the lock (only if we own it)."""
+        lua_script = """
+        if redis.call('GET', KEYS[1]) == ARGV[1] then
+            return redis.call('DEL', KEYS[1])
+        else
+            return 0
+        end
+        """
+        result = await redis_client.eval(lua_script, 1, self.key, self.identifier)
+        return bool(result)
+    
+    async def __aenter__(self):
+        if await self.acquire():
+            return self
+        raise Exception(f"Could not acquire lock: {self.key}")
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.release()
+
+# Usage
+async with DistributedLock("process_report", timeout=60):
+    # Critical section - only one process can execute this at a time
+    await process_report_logic()</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 15: Health Checks & Monitoring -->
+      <div class="category" id="category-15">
+        <div class="category-header">
+          <i class="fas fa-heartbeat"></i>
+          <h2>Health Checks & Monitoring</h2>
+        </div>
+
+        <div class="snippet" id="snippet-15-1">
+          <div class="snippet-header">
+            <h3 class="snippet-title">15.1 Comprehensive Health Check</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> בדיקת בריאות כל השירותים</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">@app.get("/health")
+async def health_check():
+    """Application health check with all services."""
+    
+    health_data = {
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "version": settings.APP_VERSION,
+        "environment": settings.ENVIRONMENT,
+        "services": {}
+    }
+    
+    # Check database
+    try:
+        db_health = await check_database_health()
+        health_data["services"]["database"] = db_health
+    except Exception as e:
+        health_data["services"]["database"] = {"status": "unhealthy", "error": str(e)}
+        health_data["status"] = "degraded"
+    
+    # Check Redis
+    try:
+        await redis_client.ping()
+        health_data["services"]["redis"] = {"status": "healthy"}
+    except Exception as e:
+        health_data["services"]["redis"] = {"status": "unhealthy", "error": str(e)}
+        health_data["status"] = "degraded"
+    
+    # Check external APIs
+    try:
+        google_service = GoogleService()
+        if await google_service.test_connection():
+            health_data["services"]["google_apis"] = {"status": "healthy"}
+        else:
+            health_data["services"]["google_apis"] = {"status": "unavailable"}
+    except Exception as e:
+        health_data["services"]["google_apis"] = {"status": "unhealthy", "error": str(e)}
+    
+    # Determine overall health
+    unhealthy = [name for name, svc in health_data["services"].items() 
+                 if svc.get("status") == "unhealthy"]
+    
+    if unhealthy:
+        health_data["status"] = "unhealthy"
+        health_data["unhealthy_services"] = unhealthy
+    
+    status_code = 200 if health_data["status"] in {"healthy", "degraded"} else 503
+    
+    return JSONResponse(content=health_data, status_code=status_code)</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 16: File Storage & Validation -->
+      <div class="category" id="category-16">
+        <div class="category-header">
+          <i class="fas fa-file-upload"></i>
+          <h2>File Storage & Validation</h2>
+        </div>
+
+        <div class="snippet" id="snippet-16-1">
+          <div class="snippet-header">
+            <h3 class="snippet-title">16.1 File Validation with Security Checks</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> בדיקות אבטחה לקבצים שעולים למערכת</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from PIL import Image
+from io import BytesIO
+import mimetypes
+
+def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
+    """
+    Validate uploaded file for security and constraints.
+    
+    Raises:
+        ValidationError: If file is invalid
+    """
+    # Check file size
+    max_size = settings.MAX_FILE_SIZE_MB * 1024 * 1024
+    if len(file_data) > max_size:
+        raise ValidationError(f"File size exceeds {settings.MAX_FILE_SIZE_MB}MB limit")
+    
+    # Check file type
+    if content_type not in settings.ALLOWED_FILE_TYPES:
+        raise ValidationError(f"File type {content_type} is not allowed")
+    
+    # Verify MIME type matches content
+    detected_type, _ = mimetypes.guess_type(filename)
+    if detected_type and detected_type != content_type:
+        logger.warning(
+            "MIME type mismatch",
+            declared=content_type,
+            detected=detected_type
+        )
+    
+    # Security checks for images
+    if content_type.startswith('image/'):
+        try:
+            # Verify it's a valid image
+            image = Image.open(BytesIO(file_data))
+            image.verify()
+            
+            # Check dimensions
+            if hasattr(image, 'size'):
+                width, height = image.size
+                if width > 10000 or height > 10000:
+                    raise ValidationError("Image dimensions too large")
+        
+        except Exception as e:
+            raise ValidationError(f"Invalid image file: {str(e)}")
+    
+    # Check for malicious content
+    if b'<script' in file_data.lower() or b'javascript:' in file_data.lower():
+        raise ValidationError("File contains potentially malicious content")</code></pre>
           </div>
         </div>
       </div>
