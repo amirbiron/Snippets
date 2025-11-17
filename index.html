@@ -3816,7 +3816,7 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
       <i class="fas fa-arrow-up"></i>
     </button>
 
-    <script>
+    <script type="text/javascript">
       // Wait for DOM to be fully loaded
       (function() {
         'use strict';
@@ -3912,7 +3912,9 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
             // Additional cleanup - remove any script-related content that might have leaked
             // But be careful not to remove legitimate code that contains these patterns
             // Only remove if it looks like actual script tags
-            text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+            // Note: We split the regex pattern to avoid </script> appearing in the code
+            const scriptTagPattern = new RegExp('<script[^>]*>[\\s\\S]*?</' + 'script>', 'gi');
+            text = text.replace(scriptTagPattern, '');
             text = text.replace(/&lt;script[^&]*&gt;[\s\S]*?&lt;\/script&gt;/gi, '');
             text = text.trim();
             
