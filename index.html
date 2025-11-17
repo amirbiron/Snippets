@@ -3930,25 +3930,25 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">import hmac
+            <pre class="language-python"><code class="language-python">import hmac
 import hashlib
 from fastapi import Header, HTTPException
 
 async def verify_telegram_webhook(
     request_body: bytes,
     x_telegram_bot_api_secret_token: str = Header(None)
-) -&gt; bool:
-    &quot;&quot;&quot;Verify that webhook request comes from Telegram&quot;&quot;&quot;
-    expected_token = os.getenv(&quot;WEBHOOK_SECRET_TOKEN&quot;)
+) -> bool:
+    """Verify that webhook request comes from Telegram"""
+    expected_token = os.getenv("WEBHOOK_SECRET_TOKEN")
     
     if not x_telegram_bot_api_secret_token:
-        raise HTTPException(401, &quot;Missing secret token&quot;)
+        raise HTTPException(401, "Missing secret token")
     
     if not hmac.compare_digest(
         x_telegram_bot_api_secret_token, 
         expected_token
     ):
-        raise HTTPException(403, &quot;Invalid secret token&quot;)
+        raise HTTPException(403, "Invalid secret token")
     
     return True</code></pre>
           </div>
@@ -3963,7 +3963,7 @@ async def verify_telegram_webhook(
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from tenacity import retry, stop_after_attempt, wait_exponential
+            <pre class="language-python"><code class="language-python">from tenacity import retry, stop_after_attempt, wait_exponential
 
 @retry(
     stop=stop_after_attempt(3),
@@ -3971,11 +3971,11 @@ async def verify_telegram_webhook(
     reraise=True
 )
 async def process_webhook_update(update: dict):
-    &quot;&quot;&quot;Process update with automatic retry on failure&quot;&quot;&quot;
+    """Process update with automatic retry on failure"""
     try:
         await handle_update(update)
     except Exception as e:
-        logger.error(f&quot;Failed processing update {update.get(&#x27;update_id&#x27;)}: {e}&quot;)
+        logger.error(f"Failed processing update {update.get('update_id')}: {e}")
         raise  # Will trigger retry</code></pre>
           </div>
         </div>
@@ -3989,7 +3989,7 @@ async def process_webhook_update(update: dict):
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from datetime import datetime, timedelta
+            <pre class="language-python"><code class="language-python">from datetime import datetime, timedelta
 from collections import deque
 
 class WebhookHealthMonitor:
@@ -4004,20 +4004,20 @@ class WebhookHealthMonitor:
         if not success:
             self.errors.append(now)
     
-    def get_health_status(self) -&gt; dict:
+    def get_health_status(self) -> dict:
         now = datetime.now()
         cutoff = now - self.window
         
-        recent_requests = sum(1 for t in self.requests if t &gt; cutoff)
-        recent_errors = sum(1 for t in self.errors if t &gt; cutoff)
+        recent_requests = sum(1 for t in self.requests if t > cutoff)
+        recent_errors = sum(1 for t in self.errors if t > cutoff)
         
         error_rate = recent_errors / recent_requests if recent_requests else 0
         
         return {
-            &quot;status&quot;: &quot;healthy&quot; if error_rate &lt; 0.05 else &quot;degraded&quot;,
-            &quot;requests_per_minute&quot;: recent_requests / self.window.seconds * 60,
-            &quot;error_rate&quot;: error_rate,
-            &quot;last_request&quot;: max(self.requests) if self.requests else None
+            "status": "healthy" if error_rate < 0.05 else "degraded",
+            "requests_per_minute": recent_requests / self.window.seconds * 60,
+            "error_rate": error_rate,
+            "last_request": max(self.requests) if self.requests else None
         }</code></pre>
           </div>
         </div>
@@ -4040,7 +4040,7 @@ class WebhookHealthMonitor:
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">import time
+            <pre class="language-python"><code class="language-python">import time
 from collections import defaultdict
 
 class TokenBucket:
@@ -4048,25 +4048,25 @@ class TokenBucket:
         self.capacity = capacity
         self.refill_rate = refill_rate  # tokens per second
         self.buckets = defaultdict(lambda: {
-            &#x27;tokens&#x27;: capacity,
-            &#x27;last_refill&#x27;: time.time()
+            'tokens': capacity,
+            'last_refill': time.time()
         })
     
-    def consume(self, key: str, tokens: int = 1) -&gt; bool:
+    def consume(self, key: str, tokens: int = 1) -> bool:
         bucket = self.buckets[key]
         now = time.time()
         
         # Refill tokens
-        time_passed = now - bucket[&#x27;last_refill&#x27;]
-        bucket[&#x27;tokens&#x27;] = min(
+        time_passed = now - bucket['last_refill']
+        bucket['tokens'] = min(
             self.capacity,
-            bucket[&#x27;tokens&#x27;] + time_passed * self.refill_rate
+            bucket['tokens'] + time_passed * self.refill_rate
         )
-        bucket[&#x27;last_refill&#x27;] = now
+        bucket['last_refill'] = now
         
         # Try to consume
-        if bucket[&#x27;tokens&#x27;] &gt;= tokens:
-            bucket[&#x27;tokens&#x27;] -= tokens
+        if bucket['tokens'] >= tokens:
+            bucket['tokens'] -= tokens
             return True
         return False</code></pre>
           </div>
@@ -4081,7 +4081,7 @@ class TokenBucket:
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from functools import wraps
+            <pre class="language-python"><code class="language-python">from functools import wraps
 from telegram import Update
 
 class UserRateLimiter:
@@ -4096,9 +4096,9 @@ class UserRateLimiter:
         async def wrapper(update: Update, context):
             user_id = update.effective_user.id
             
-            if not self.bucket.consume(f&quot;user:{user_id}&quot;):
+            if not self.bucket.consume(f"user:{user_id}"):
                 await update.message.reply_text(
-                    &quot;⏳ Too many requests. Please wait a moment.&quot;
+                    "⏳ Too many requests. Please wait a moment."
                 )
                 return
             
@@ -4108,7 +4108,7 @@ class UserRateLimiter:
 # Usage
 @UserRateLimiter(max_requests=10, window_seconds=60)
 async def handle_command(update: Update, context):
-    await update.message.reply_text(&quot;Processing...&quot;)</code></pre>
+    await update.message.reply_text("Processing...")</code></pre>
           </div>
         </div>
 
@@ -4121,7 +4121,7 @@ async def handle_command(update: Update, context):
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">import redis.asyncio as redis
+            <pre class="language-python"><code class="language-python">import redis.asyncio as redis
 from datetime import timedelta
 
 class RedisRateLimiter:
@@ -4133,7 +4133,7 @@ class RedisRateLimiter:
         key: str, 
         max_requests: int, 
         window: timedelta
-    ) -&gt; bool:
+    ) -> bool:
         pipe = self.redis.pipeline()
         now = int(time.time())
         window_start = now - int(window.total_seconds())
@@ -4150,11 +4150,11 @@ class RedisRateLimiter:
         results = await pipe.execute()
         request_count = results[1]
         
-        return request_count &lt; max_requests
+        return request_count < max_requests
 
 # Usage
 limiter = RedisRateLimiter(redis_client)
-if await limiter.is_allowed(f&quot;user:{user_id}&quot;, 20, timedelta(minutes=1)):
+if await limiter.is_allowed(f"user:{user_id}", 20, timedelta(minutes=1)):
     # Process request
     pass</code></pre>
           </div>
@@ -4178,11 +4178,11 @@ if await limiter.is_allowed(f&quot;user:{user_id}&quot;, 20, timedelta(minutes=1
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">import asyncio
+            <pre class="language-python"><code class="language-python">import asyncio
 import random
 from typing import TypeVar, Callable
 
-T = TypeVar(&#x27;T&#x27;)
+T = TypeVar('T')
 
 async def retry_with_backoff(
     func: Callable[..., T],
@@ -4190,8 +4190,8 @@ async def retry_with_backoff(
     base_delay: float = 1.0,
     max_delay: float = 60.0,
     *args, **kwargs
-) -&gt; T:
-    &quot;&quot;&quot;Retry with exponential backoff and jitter&quot;&quot;&quot;
+) -> T:
+    """Retry with exponential backoff and jitter"""
     for attempt in range(max_retries):
         try:
             return await func(*args, **kwargs)
@@ -4205,8 +4205,8 @@ async def retry_with_backoff(
             wait_time = delay + jitter
             
             logger.warning(
-                f&quot;Attempt {attempt + 1} failed: {e}. &quot;
-                f&quot;Retrying in {wait_time:.2f}s...&quot;
+                f"Attempt {attempt + 1} failed: {e}. "
+                f"Retrying in {wait_time:.2f}s..."
             )
             await asyncio.sleep(wait_time)</code></pre>
           </div>
@@ -4221,13 +4221,13 @@ async def retry_with_backoff(
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from enum import Enum
+            <pre class="language-python"><code class="language-python">from enum import Enum
 from datetime import datetime, timedelta
 
 class CircuitState(Enum):
-    CLOSED = &quot;closed&quot;  # Normal operation
-    OPEN = &quot;open&quot;      # Blocking requests
-    HALF_OPEN = &quot;half_open&quot;  # Testing recovery
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"      # Blocking requests
+    HALF_OPEN = "half_open"  # Testing recovery
 
 class CircuitBreaker:
     def __init__(
@@ -4247,11 +4247,11 @@ class CircuitBreaker:
     
     async def call(self, func, *args, **kwargs):
         if self.state == CircuitState.OPEN:
-            if datetime.now() - self.opened_at &gt; self.timeout:
+            if datetime.now() - self.opened_at > self.timeout:
                 self.state = CircuitState.HALF_OPEN
                 self.success_count = 0
             else:
-                raise Exception(&quot;Circuit breaker is OPEN&quot;)
+                raise Exception("Circuit breaker is OPEN")
         
         try:
             result = await func(*args, **kwargs)
@@ -4265,12 +4265,12 @@ class CircuitBreaker:
         self.failure_count = 0
         if self.state == CircuitState.HALF_OPEN:
             self.success_count += 1
-            if self.success_count &gt;= self.success_threshold:
+            if self.success_count >= self.success_threshold:
                 self.state = CircuitState.CLOSED
     
     def _on_failure(self):
         self.failure_count += 1
-        if self.failure_count &gt;= self.failure_threshold:
+        if self.failure_count >= self.failure_threshold:
             self.state = CircuitState.OPEN
             self.opened_at = datetime.now()</code></pre>
           </div>
@@ -4285,7 +4285,7 @@ class CircuitBreaker:
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from functools import wraps
+            <pre class="language-python"><code class="language-python">from functools import wraps
 import asyncio
 import random
 
@@ -4308,7 +4308,7 @@ def async_retry(
                     jitter = random.uniform(0, delay * 0.3)
                     await asyncio.sleep(delay + jitter)
                     
-                    logger.info(f&quot;Retry {attempt + 1}/{max_attempts} for {func.__name__}&quot;)
+                    logger.info(f"Retry {attempt + 1}/{max_attempts} for {func.__name__}")
         return wrapper
     return decorator
 
@@ -4337,7 +4337,7 @@ async def send_telegram_message(chat_id, text):
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from telegram import InlineQueryResultArticle, InputTextMessageContent
+            <pre class="language-python"><code class="language-python">from telegram import InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import InlineQueryHandler
 from functools import lru_cache
 from hashlib import md5
@@ -4348,7 +4348,7 @@ class CachedInlineQueryHandler:
         self.cache_ttl = cache_ttl
     
     @staticmethod
-    def _cache_key(query: str) -&gt; str:
+    def _cache_key(query: str) -> str:
         return md5(query.encode()).hexdigest()
     
     async def handle_inline_query(self, update, context):
@@ -4361,25 +4361,25 @@ class CachedInlineQueryHandler:
         cache_key = self._cache_key(query)
         cached = self.cache.get(cache_key)
         
-        if cached and time.time() - cached[&#x27;time&#x27;] &lt; self.cache_ttl:
-            results = cached[&#x27;results&#x27;]
+        if cached and time.time() - cached['time'] < self.cache_ttl:
+            results = cached['results']
         else:
             # Perform search
             results = await self.search_content(query)
             self.cache[cache_key] = {
-                &#x27;results&#x27;: results,
-                &#x27;time&#x27;: time.time()
+                'results': results,
+                'time': time.time()
             }
         
         await update.inline_query.answer(results, cache_time=self.cache_ttl)
     
-    async def search_content(self, query: str) -&gt; list:
-        &quot;&quot;&quot;Override this with your search logic&quot;&quot;&quot;
+    async def search_content(self, query: str) -> list:
+        """Override this with your search logic"""
         return [
             InlineQueryResultArticle(
                 id=str(i),
-                title=f&quot;Result {i}&quot;,
-                input_message_content=InputTextMessageContent(f&quot;Content: {query}&quot;)
+                title=f"Result {i}",
+                input_message_content=InputTextMessageContent(f"Content: {query}")
             )
             for i in range(5)
         ]</code></pre>
@@ -4395,7 +4395,7 @@ class CachedInlineQueryHandler:
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from telegram import InlineQueryResultsButton, InlineQueryResultArticle
+            <pre class="language-python"><code class="language-python">from telegram import InlineQueryResultsButton, InlineQueryResultArticle
 from uuid import uuid4
 
 class InlineQueryPaginator:
@@ -4405,26 +4405,26 @@ class InlineQueryPaginator:
     
     async def handle_paginated_query(self, update, context):
         query = update.inline_query.query
-        offset = update.inline_query.offset or &quot;0&quot;
+        offset = update.inline_query.offset or "0"
         
         # Get or generate all results
         session_id = str(uuid4())
-        if offset == &quot;0&quot;:
+        if offset == "0":
             all_results = await self.fetch_all_results(query)
             self.results_cache[session_id] = all_results
         else:
-            session_id = offset.split(&quot;:&quot;)[0]
+            session_id = offset.split(":")[0]
             all_results = self.results_cache.get(session_id, [])
         
         # Parse offset
-        start = int(offset.split(&quot;:&quot;)[-1]) if &quot;:&quot; in offset else 0
+        start = int(offset.split(":")[-1]) if ":" in offset else 0
         end = start + self.page_size
         
         # Slice results
         page_results = all_results[start:end]
         
         # Calculate next offset
-        next_offset = f&quot;{session_id}:{end}&quot; if end &lt; len(all_results) else &quot;&quot;
+        next_offset = f"{session_id}:{end}" if end < len(all_results) else ""
         
         await update.inline_query.answer(
             page_results,
@@ -4432,8 +4432,8 @@ class InlineQueryPaginator:
             cache_time=10
         )
     
-    async def fetch_all_results(self, query: str) -&gt; list:
-        &quot;&quot;&quot;Fetch all matching results&quot;&quot;&quot;
+    async def fetch_all_results(self, query: str) -> list:
+        """Fetch all matching results"""
         # Your search logic here
         return []</code></pre>
           </div>
@@ -4448,7 +4448,7 @@ class InlineQueryPaginator:
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from telegram.ext import InlineQueryHandler
+            <pre class="language-python"><code class="language-python">from telegram.ext import InlineQueryHandler
 from collections import defaultdict
 import time
 
@@ -4465,15 +4465,15 @@ class RateLimitedInlineHandler:
         # Clean old entries
         self.user_queries[user_id] = [
             t for t in self.user_queries[user_id]
-            if now - t &lt; self.window
+            if now - t < self.window
         ]
         
         # Check limit
-        if len(self.user_queries[user_id]) &gt;= self.max_queries:
+        if len(self.user_queries[user_id]) >= self.max_queries:
             await update.inline_query.answer(
                 [],
-                switch_pm_text=&quot;⚠️ Rate limit exceeded&quot;,
-                switch_pm_parameter=&quot;rate_limit&quot;
+                switch_pm_text="⚠️ Rate limit exceeded",
+                switch_pm_parameter="rate_limit"
             )
             return
         
@@ -4504,7 +4504,7 @@ class RateLimitedInlineHandler:
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from apscheduler.schedulers.asyncio import AsyncIOScheduler
+            <pre class="language-python"><code class="language-python">from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.date import DateTrigger
 from datetime import datetime
 
@@ -4520,9 +4520,9 @@ class MessageScheduler:
         text: str, 
         send_at: datetime,
         job_id: str = None
-    ) -&gt; str:
-        &quot;&quot;&quot;Schedule a message to be sent at specific time&quot;&quot;&quot;
-        job_id = job_id or f&quot;msg_{chat_id}_{int(send_at.timestamp())}&quot;
+    ) -> str:
+        """Schedule a message to be sent at specific time"""
+        job_id = job_id or f"msg_{chat_id}_{int(send_at.timestamp())}"
         
         self.scheduler.add_job(
             self._send_message,
@@ -4538,9 +4538,9 @@ class MessageScheduler:
         try:
             await self.bot.send_message(chat_id, text)
         except Exception as e:
-            logger.error(f&quot;Failed to send scheduled message: {e}&quot;)
+            logger.error(f"Failed to send scheduled message: {e}")
     
-    def cancel_scheduled_message(self, job_id: str) -&gt; bool:
+    def cancel_scheduled_message(self, job_id: str) -> bool:
         try:
             self.scheduler.remove_job(job_id)
             return True
@@ -4551,7 +4551,7 @@ class MessageScheduler:
 scheduler = MessageScheduler(bot)
 scheduler.schedule_message(
     chat_id=123456,
-    text=&quot;Reminder: Meeting in 10 minutes!&quot;,
+    text="Reminder: Meeting in 10 minutes!",
     send_at=datetime.now() + timedelta(hours=1)
 )</code></pre>
           </div>
@@ -4566,7 +4566,7 @@ scheduler.schedule_message(
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">import asyncio
+            <pre class="language-python"><code class="language-python">import asyncio
 from typing import Callable, Any
 
 class DelayedJobQueue:
@@ -4581,7 +4581,7 @@ class DelayedJobQueue:
         *args,
         **kwargs
     ):
-        &quot;&quot;&quot;Execute function after delay&quot;&quot;&quot;
+        """Execute function after delay"""
         # Cancel existing job with same ID
         if job_id in self.tasks:
             self.tasks[job_id].cancel()
@@ -4597,7 +4597,7 @@ class DelayedJobQueue:
         self.tasks[job_id] = task
         return task
     
-    def cancel_job(self, job_id: str) -&gt; bool:
+    def cancel_job(self, job_id: str) -> bool:
         if job_id in self.tasks:
             self.tasks[job_id].cancel()
             self.tasks.pop(job_id)
@@ -4607,7 +4607,7 @@ class DelayedJobQueue:
 # Usage
 queue = DelayedJobQueue()
 await queue.schedule_delayed(
-    job_id=f&quot;delete_msg_{chat_id}_{msg_id}&quot;,
+    job_id=f"delete_msg_{chat_id}_{msg_id}",
     func=bot.delete_message,
     delay_seconds=300,  # 5 minutes
     chat_id=chat_id,
@@ -4625,7 +4625,7 @@ await queue.schedule_delayed(
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from apscheduler.schedulers.asyncio import AsyncIOScheduler
+            <pre class="language-python"><code class="language-python">from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -4641,7 +4641,7 @@ class RecurringTaskManager:
         minute: int = 0,
         job_id: str = None
     ):
-        &quot;&quot;&quot;Run task daily at specific time&quot;&quot;&quot;
+        """Run task daily at specific time"""
         self.scheduler.add_job(
             func,
             trigger=CronTrigger(hour=hour, minute=minute),
@@ -4656,7 +4656,7 @@ class RecurringTaskManager:
         hours: int = None,
         job_id: str = None
     ):
-        &quot;&quot;&quot;Run task at regular intervals&quot;&quot;&quot;
+        """Run task at regular intervals"""
         self.scheduler.add_job(
             func,
             trigger=IntervalTrigger(minutes=minutes, hours=hours),
@@ -4675,14 +4675,14 @@ tasks.add_daily_task(
     send_daily_summary,
     hour=9,
     minute=0,
-    job_id=&quot;daily_summary&quot;
+    job_id="daily_summary"
 )
 
 # Check for updates every 30 minutes
 tasks.add_interval_task(
     check_updates,
     minutes=30,
-    job_id=&quot;update_checker&quot;
+    job_id="update_checker"
 )</code></pre>
           </div>
         </div>
@@ -4705,16 +4705,16 @@ tasks.add_interval_task(
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python"># alembic/env.py helper
+            <pre class="language-python"><code class="language-python"># alembic/env.py helper
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 from logging.config import fileConfig
 
 def run_migrations_online():
-    &quot;&quot;&quot;Run migrations in &#x27;online&#x27; mode with connection pooling&quot;&quot;&quot;
+    """Run migrations in 'online' mode with connection pooling"""
     connectable = engine_from_config(
         context.config.get_section(context.config.config_ini_section),
-        prefix=&quot;sqlalchemy.&quot;,
+        prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
 
@@ -4733,16 +4733,16 @@ def run_migrations_online():
 # Migration file pattern for adding column with data
 def upgrade():
     # Add column as nullable first
-    op.add_column(&#x27;users&#x27;, sa.Column(&#x27;status&#x27;, sa.String(20), nullable=True))
+    op.add_column('users', sa.Column('status', sa.String(20), nullable=True))
     
     # Populate existing rows
-    op.execute(&quot;UPDATE users SET status = &#x27;active&#x27; WHERE status IS NULL&quot;)
+    op.execute("UPDATE users SET status = 'active' WHERE status IS NULL")
     
     # Make it non-nullable
-    op.alter_column(&#x27;users&#x27;, &#x27;status&#x27;, nullable=False)
+    op.alter_column('users', 'status', nullable=False)
 
 def downgrade():
-    op.drop_column(&#x27;users&#x27;, &#x27;status&#x27;)</code></pre>
+    op.drop_column('users', 'status')</code></pre>
           </div>
         </div>
 
@@ -4755,7 +4755,7 @@ def downgrade():
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from alembic import op
+            <pre class="language-python"><code class="language-python">from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.sql import table, column
 
@@ -4766,13 +4766,13 @@ def batch_update_data(
     update_func: Callable,
     batch_size: int = 1000
 ):
-    &quot;&quot;&quot;Update data in batches to avoid locking table&quot;&quot;&quot;
+    """Update data in batches to avoid locking table"""
     conn = op.get_bind()
     
     # Create table reference
     t = table(
         table_name,
-        column(&#x27;id&#x27;, sa.Integer),
+        column('id', sa.Integer),
         column(condition_column),
         column(update_column)
     )
@@ -4802,12 +4802,12 @@ def batch_update_data(
 
 # Usage in migration
 def upgrade():
-    op.add_column(&#x27;messages&#x27;, sa.Column(&#x27;processed_text&#x27;, sa.Text))
+    op.add_column('messages', sa.Column('processed_text', sa.Text))
     
     batch_update_data(
-        &#x27;messages&#x27;,
-        update_column=&#x27;processed_text&#x27;,
-        condition_column=&#x27;raw_text&#x27;,
+        'messages',
+        update_column='processed_text',
+        condition_column='raw_text',
         update_func=lambda text: text.strip().lower()
     )</code></pre>
           </div>
@@ -4822,41 +4822,41 @@ def upgrade():
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">def safe_migration_with_backup():
-    &quot;&quot;&quot;Pattern for safe migration with backup table&quot;&quot;&quot;
+            <pre class="language-python"><code class="language-python">def safe_migration_with_backup():
+    """Pattern for safe migration with backup table"""
     # Create backup table
-    op.execute(&quot;&quot;&quot;
+    op.execute("""
         CREATE TABLE users_backup AS 
         SELECT * FROM users
-    &quot;&quot;&quot;)
+    """)
     
     try:
         # Perform migration
-        op.add_column(&#x27;users&#x27;, sa.Column(&#x27;new_field&#x27;, sa.String(100)))
-        op.execute(&quot;UPDATE users SET new_field = old_field || &#x27;_processed&#x27;&quot;)
-        op.drop_column(&#x27;users&#x27;, &#x27;old_field&#x27;)
+        op.add_column('users', sa.Column('new_field', sa.String(100)))
+        op.execute("UPDATE users SET new_field = old_field || '_processed'")
+        op.drop_column('users', 'old_field')
         
         # Drop backup if successful
-        op.execute(&quot;DROP TABLE users_backup&quot;)
+        op.execute("DROP TABLE users_backup")
     except Exception as e:
         # Restore from backup
-        op.execute(&quot;DROP TABLE users&quot;)
-        op.execute(&quot;ALTER TABLE users_backup RENAME TO users&quot;)
+        op.execute("DROP TABLE users")
+        op.execute("ALTER TABLE users_backup RENAME TO users")
         raise
 
 def downgrade():
-    &quot;&quot;&quot;Always include meaningful downgrade&quot;&quot;&quot;
+    """Always include meaningful downgrade"""
     # Re-add old column
-    op.add_column(&#x27;users&#x27;, sa.Column(&#x27;old_field&#x27;, sa.String(100)))
+    op.add_column('users', sa.Column('old_field', sa.String(100)))
     
     # Reverse data transformation
-    op.execute(&quot;&quot;&quot;
+    op.execute("""
         UPDATE users 
-        SET old_field = REPLACE(new_field, &#x27;_processed&#x27;, &#x27;&#x27;)
-    &quot;&quot;&quot;)
+        SET old_field = REPLACE(new_field, '_processed', '')
+    """)
     
     # Remove new column
-    op.drop_column(&#x27;users&#x27;, &#x27;new_field&#x27;)</code></pre>
+    op.drop_column('users', 'new_field')</code></pre>
           </div>
         </div>
 
@@ -4878,7 +4878,7 @@ def downgrade():
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">import aiohttp
+            <pre class="language-python"><code class="language-python">import aiohttp
 from typing import Optional, Dict, Any
 import asyncio
 
@@ -4906,9 +4906,9 @@ class ResilientAPIClient:
         method: str, 
         endpoint: str,
         **kwargs
-    ) -&gt; Dict[Any, Any]:
-        &quot;&quot;&quot;Make HTTP request with retry logic&quot;&quot;&quot;
-        url = f&quot;{self.base_url}/{endpoint.lstrip(&#x27;/&#x27;)}&quot;
+    ) -> Dict[Any, Any]:
+        """Make HTTP request with retry logic"""
+        url = f"{self.base_url}/{endpoint.lstrip('/')}"
         
         for attempt in range(self.max_retries):
             try:
@@ -4921,18 +4921,18 @@ class ResilientAPIClient:
                     raise
                 
                 wait = 2 ** attempt
-                logger.warning(f&quot;Request failed, retry {attempt + 1} in {wait}s&quot;)
+                logger.warning(f"Request failed, retry {attempt + 1} in {wait}s")
                 await asyncio.sleep(wait)
         
     async def get(self, endpoint: str, **kwargs):
-        return await self.request(&quot;GET&quot;, endpoint, **kwargs)
+        return await self.request("GET", endpoint, **kwargs)
     
     async def post(self, endpoint: str, **kwargs):
-        return await self.request(&quot;POST&quot;, endpoint, **kwargs)
+        return await self.request("POST", endpoint, **kwargs)
 
 # Usage
-async with ResilientAPIClient(&quot;https://api.example.com&quot;) as client:
-    data = await client.get(&quot;/users/123&quot;)</code></pre>
+async with ResilientAPIClient("https://api.example.com") as client:
+    data = await client.get("/users/123")</code></pre>
           </div>
         </div>
 
@@ -4945,13 +4945,13 @@ async with ResilientAPIClient(&quot;https://api.example.com&quot;) as client:
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">import json
+            <pre class="language-python"><code class="language-python">import json
 import logging
 from functools import wraps
 from time import time
 
 class APILogger:
-    def __init__(self, logger_name: str = &quot;api_client&quot;):
+    def __init__(self, logger_name: str = "api_client"):
         self.logger = logging.getLogger(logger_name)
     
     def log_request_response(self, func):
@@ -4961,10 +4961,10 @@ class APILogger:
             
             # Log request
             self.logger.info(
-                f&quot;API Request: {func.__name__}&quot;,
+                f"API Request: {func.__name__}",
                 extra={
-                    &quot;args&quot;: str(args)[:200],
-                    &quot;kwargs&quot;: {k: str(v)[:100] for k, v in kwargs.items()}
+                    "args": str(args)[:200],
+                    "kwargs": {k: str(v)[:100] for k, v in kwargs.items()}
                 }
             )
             
@@ -4974,10 +4974,10 @@ class APILogger:
                 
                 # Log successful response
                 self.logger.info(
-                    f&quot;API Response: {func.__name__} completed&quot;,
+                    f"API Response: {func.__name__} completed",
                     extra={
-                        &quot;duration_ms&quot;: int(duration * 1000),
-                        &quot;response_size&quot;: len(str(response))
+                        "duration_ms": int(duration * 1000),
+                        "response_size": len(str(response))
                     }
                 )
                 
@@ -4988,11 +4988,11 @@ class APILogger:
                 
                 # Log error
                 self.logger.error(
-                    f&quot;API Error: {func.__name__} failed&quot;,
+                    f"API Error: {func.__name__} failed",
                     extra={
-                        &quot;duration_ms&quot;: int(duration * 1000),
-                        &quot;error&quot;: str(e),
-                        &quot;error_type&quot;: type(e).__name__
+                        "duration_ms": int(duration * 1000),
+                        "error": str(e),
+                        "error_type": type(e).__name__
                     },
                     exc_info=True
                 )
@@ -5020,7 +5020,7 @@ class MyAPIClient:
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">import asyncio
+            <pre class="language-python"><code class="language-python">import asyncio
 from datetime import datetime, timedelta
 from collections import deque
 
@@ -5031,18 +5031,18 @@ class APIRateLimiter:
         self.lock = asyncio.Lock()
     
     async def acquire(self):
-        &quot;&quot;&quot;Wait until we can make another request&quot;&quot;&quot;
+        """Wait until we can make another request"""
         async with self.lock:
             now = datetime.now()
             
             # Remove requests older than 1 second
-            while self.requests and now - self.requests[0] &gt; timedelta(seconds=1):
+            while self.requests and now - self.requests[0] > timedelta(seconds=1):
                 self.requests.popleft()
             
             # If at limit, wait
-            if len(self.requests) &gt;= self.rate:
+            if len(self.requests) >= self.rate:
                 sleep_time = 1 - (now - self.requests[0]).total_seconds()
-                if sleep_time &gt; 0:
+                if sleep_time > 0:
                     await asyncio.sleep(sleep_time)
                 self.requests.popleft()
             
@@ -5059,7 +5059,7 @@ class RateLimitedClient:
 
 # Usage with multiple requests
 client = RateLimitedClient(requests_per_second=20)
-tasks = [client.call_api(f&quot;/endpoint/{i}&quot;) for i in range(100)]
+tasks = [client.call_api(f"/endpoint/{i}") for i in range(100)]
 results = await asyncio.gather(*tasks)  # Will respect rate limit</code></pre>
           </div>
         </div>
@@ -5082,13 +5082,13 @@ results = await asyncio.gather(*tasks)  # Will respect rate limit</code></pre>
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">import asyncio
+            <pre class="language-python"><code class="language-python">import asyncio
 from functools import wraps
 from typing import Optional
 import time
 
 def retry(attempts: int = 3, delay: float = 1.0):
-    &quot;&quot;&quot;Retry decorator for async functions&quot;&quot;&quot;
+    """Retry decorator for async functions"""
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -5103,7 +5103,7 @@ def retry(attempts: int = 3, delay: float = 1.0):
     return decorator
 
 def timeout(seconds: float):
-    &quot;&quot;&quot;Timeout decorator for async functions&quot;&quot;&quot;
+    """Timeout decorator for async functions"""
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -5114,13 +5114,13 @@ def timeout(seconds: float):
                 )
             except asyncio.TimeoutError:
                 raise TimeoutError(
-                    f&quot;{func.__name__} exceeded {seconds}s timeout&quot;
+                    f"{func.__name__} exceeded {seconds}s timeout"
                 )
         return wrapper
     return decorator
 
 def cache(ttl: Optional[int] = None):
-    &quot;&quot;&quot;Simple cache decorator with optional TTL&quot;&quot;&quot;
+    """Simple cache decorator with optional TTL"""
     cache_data = {}
     
     def decorator(func):
@@ -5130,7 +5130,7 @@ def cache(ttl: Optional[int] = None):
             
             if key in cache_data:
                 cached_time, cached_value = cache_data[key]
-                if ttl is None or time.time() - cached_time &lt; ttl:
+                if ttl is None or time.time() - cached_time < ttl:
                     return cached_value
             
             result = await func(*args, **kwargs)
@@ -5146,7 +5146,7 @@ def cache(ttl: Optional[int] = None):
 @cache(ttl=300)
 async def fetch_user_data(user_id: int):
     # Will retry up to 3 times, timeout after 10s, cache for 5 minutes
-    return await api.get(f&quot;/users/{user_id}&quot;)</code></pre>
+    return await api.get(f"/users/{user_id}")</code></pre>
           </div>
         </div>
 
@@ -5159,12 +5159,12 @@ async def fetch_user_data(user_id: int):
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from functools import wraps
+            <pre class="language-python"><code class="language-python">from functools import wraps
 from telegram import Update
 from telegram.ext import ContextTypes
 
 def require_auth(func):
-    &quot;&quot;&quot;Require user to be registered&quot;&quot;&quot;
+    """Require user to be registered"""
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
@@ -5172,7 +5172,7 @@ def require_auth(func):
         user = await db.get_user(user_id)
         if not user:
             await update.message.reply_text(
-                &quot;⚠️ Please register first with /start&quot;
+                "⚠️ Please register first with /start"
             )
             return
         
@@ -5180,20 +5180,20 @@ def require_auth(func):
     return wrapper
 
 def admin_only(func):
-    &quot;&quot;&quot;Restrict command to admin users&quot;&quot;&quot;
+    """Restrict command to admin users"""
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         
         if user_id not in ADMIN_USER_IDS:
-            await update.message.reply_text(&quot;⛔ Admin access required&quot;)
+            await update.message.reply_text("⛔ Admin access required")
             return
         
         return await func(update, context)
     return wrapper
 
 def chat_type(*allowed_types):
-    &quot;&quot;&quot;Restrict to specific chat types (private, group, channel)&quot;&quot;&quot;
+    """Restrict to specific chat types (private, group, channel)"""
     def decorator(func):
         @wraps(func)
         async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -5201,7 +5201,7 @@ def chat_type(*allowed_types):
             
             if chat_type not in allowed_types:
                 await update.message.reply_text(
-                    f&quot;This command works only in: {&#x27;, &#x27;.join(allowed_types)}&quot;
+                    f"This command works only in: {', '.join(allowed_types)}"
                 )
                 return
             
@@ -5216,7 +5216,7 @@ async def ban_user(update, context):
     pass
 
 @require_auth
-@chat_type(&quot;private&quot;)
+@chat_type("private")
 async def settings(update, context):
     # Only registered users in private chat
     pass</code></pre>
@@ -5232,14 +5232,14 @@ async def settings(update, context):
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from functools import wraps
+            <pre class="language-python"><code class="language-python">from functools import wraps
 import time
 import logging
 
 logger = logging.getLogger(__name__)
 
 def log_execution_time(threshold_ms: Optional[int] = None):
-    &quot;&quot;&quot;Log execution time, warn if exceeds threshold&quot;&quot;&quot;
+    """Log execution time, warn if exceeds threshold"""
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -5252,19 +5252,19 @@ def log_execution_time(threshold_ms: Optional[int] = None):
                 duration_ms = (time.time() - start) * 1000
                 
                 log_data = {
-                    &quot;function&quot;: func.__name__,
-                    &quot;duration_ms&quot;: round(duration_ms, 2)
+                    "function": func.__name__,
+                    "duration_ms": round(duration_ms, 2)
                 }
                 
-                if threshold_ms and duration_ms &gt; threshold_ms:
+                if threshold_ms and duration_ms > threshold_ms:
                     logger.warning(
-                        f&quot;Slow execution: {func.__name__} took {duration_ms:.2f}ms &quot;
-                        f&quot;(threshold: {threshold_ms}ms)&quot;,
+                        f"Slow execution: {func.__name__} took {duration_ms:.2f}ms "
+                        f"(threshold: {threshold_ms}ms)",
                         extra=log_data
                     )
                 else:
                     logger.debug(
-                        f&quot;{func.__name__} completed in {duration_ms:.2f}ms&quot;,
+                        f"{func.__name__} completed in {duration_ms:.2f}ms",
                         extra=log_data
                     )
         
@@ -5274,7 +5274,7 @@ def log_execution_time(threshold_ms: Optional[int] = None):
 # Usage
 @log_execution_time(threshold_ms=1000)
 async def process_large_file(file_path: str):
-    # Will warn if takes &gt; 1 second
+    # Will warn if takes > 1 second
     pass</code></pre>
           </div>
         </div>
@@ -5297,7 +5297,7 @@ async def process_large_file(file_path: str):
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from telegram import LabeledPrice, Update
+            <pre class="language-python"><code class="language-python">from telegram import LabeledPrice, Update
 from telegram.ext import ContextTypes, PreCheckoutQueryHandler
 
 class PaymentProcessor:
@@ -5311,18 +5311,18 @@ class PaymentProcessor:
         description: str,
         payload: str,
         amount: int,  # In smallest currency unit (cents)
-        currency: str = &quot;USD&quot;
+        currency: str = "USD"
     ):
-        &quot;&quot;&quot;Send payment invoice to user&quot;&quot;&quot;
+        """Send payment invoice to user"""
         await update.message.reply_invoice(
             title=title,
             description=description,
             payload=payload,
             provider_token=self.provider_token,
             currency=currency,
-            prices=[LabeledPrice(&quot;Price&quot;, amount)],
-            start_parameter=&quot;payment&quot;,
-            photo_url=&quot;https://example.com/product.jpg&quot;,  # Optional
+            prices=[LabeledPrice("Price", amount)],
+            start_parameter="payment",
+            photo_url="https://example.com/product.jpg",  # Optional
             need_name=True,
             need_email=True,
             need_shipping_address=False,
@@ -5333,14 +5333,14 @@ class PaymentProcessor:
         update: Update, 
         context: ContextTypes.DEFAULT_TYPE
     ):
-        &quot;&quot;&quot;Validate payment before processing&quot;&quot;&quot;
+        """Validate payment before processing"""
         query = update.pre_checkout_query
         
         # Verify payload and amount
         if not await self._validate_payment(query.invoice_payload, query.total_amount):
             await query.answer(
                 ok=False,
-                error_message=&quot;Payment validation failed&quot;
+                error_message="Payment validation failed"
             )
             return
         
@@ -5351,23 +5351,23 @@ class PaymentProcessor:
         update: Update,
         context: ContextTypes.DEFAULT_TYPE
     ):
-        &quot;&quot;&quot;Process successful payment&quot;&quot;&quot;
+        """Process successful payment"""
         payment = update.message.successful_payment
         
         # Log payment
         await db.save_payment({
-            &quot;user_id&quot;: update.effective_user.id,
-            &quot;amount&quot;: payment.total_amount,
-            &quot;currency&quot;: payment.currency,
-            &quot;payload&quot;: payment.invoice_payload,
-            &quot;telegram_payment_id&quot;: payment.telegram_payment_charge_id
+            "user_id": update.effective_user.id,
+            "amount": payment.total_amount,
+            "currency": payment.currency,
+            "payload": payment.invoice_payload,
+            "telegram_payment_id": payment.telegram_payment_charge_id
         })
         
         # Grant access or deliver product
         await self._fulfill_order(payment.invoice_payload, update.effective_user.id)
         
         await update.message.reply_text(
-            &quot;✅ Payment successful! Thank you for your purchase.&quot;
+            "✅ Payment successful! Thank you for your purchase."
         )
 
 # Usage
@@ -5385,7 +5385,7 @@ app.add_handler(PreCheckoutQueryHandler(payment_processor.handle_pre_checkout))<
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from telegram import LabeledPrice
+            <pre class="language-python"><code class="language-python">from telegram import LabeledPrice
 from dataclasses import dataclass
 from typing import List
 
@@ -5399,27 +5399,27 @@ class InvoiceBuilder:
         self.items: List[InvoiceItem] = []
     
     def add_item(self, label: str, amount: int):
-        &quot;&quot;&quot;Add item to invoice&quot;&quot;&quot;
+        """Add item to invoice"""
         self.items.append(InvoiceItem(label, amount))
         return self
     
     def add_tax(self, percentage: float):
-        &quot;&quot;&quot;Add tax based on current total&quot;&quot;&quot;
+        """Add tax based on current total"""
         subtotal = self.get_total()
         tax_amount = int(subtotal * percentage / 100)
-        self.items.append(InvoiceItem(f&quot;Tax ({percentage}%)&quot;, tax_amount))
+        self.items.append(InvoiceItem(f"Tax ({percentage}%)", tax_amount))
         return self
     
     def add_discount(self, label: str, amount: int):
-        &quot;&quot;&quot;Add discount (negative amount)&quot;&quot;&quot;
+        """Add discount (negative amount)"""
         self.items.append(InvoiceItem(label, -amount))
         return self
     
-    def get_total(self) -&gt; int:
+    def get_total(self) -> int:
         return sum(item.amount for item in self.items)
     
-    def build_prices(self) -&gt; List[LabeledPrice]:
-        &quot;&quot;&quot;Convert to Telegram LabeledPrice format&quot;&quot;&quot;
+    def build_prices(self) -> List[LabeledPrice]:
+        """Convert to Telegram LabeledPrice format"""
         return [
             LabeledPrice(item.label, item.amount)
             for item in self.items
@@ -5427,18 +5427,18 @@ class InvoiceBuilder:
 
 # Usage
 invoice = InvoiceBuilder()
-invoice.add_item(&quot;Premium Plan (1 month)&quot;, 999)  # $9.99
-invoice.add_item(&quot;Extra Storage (10GB)&quot;, 299)     # $2.99
-invoice.add_discount(&quot;First-time user discount&quot;, 200)  # -$2.00
+invoice.add_item("Premium Plan (1 month)", 999)  # $9.99
+invoice.add_item("Extra Storage (10GB)", 299)     # $2.99
+invoice.add_discount("First-time user discount", 200)  # -$2.00
 invoice.add_tax(10)  # 10% tax
 
 await bot.send_invoice(
     chat_id=user_id,
-    title=&quot;Subscription Invoice&quot;,
-    description=&quot;Your monthly subscription&quot;,
-    payload=&quot;subscription_monthly&quot;,
+    title="Subscription Invoice",
+    description="Your monthly subscription",
+    payload="subscription_monthly",
     provider_token=PROVIDER_TOKEN,
-    currency=&quot;USD&quot;,
+    currency="USD",
     prices=invoice.build_prices()
 )</code></pre>
           </div>
@@ -5453,7 +5453,7 @@ await bot.send_invoice(
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">import hmac
+            <pre class="language-python"><code class="language-python">import hmac
 import hashlib
 from typing import Optional
 
@@ -5468,9 +5468,9 @@ class PaymentVerifier:
         currency: str,
         provider_payment_id: str,
         signature: str
-    ) -&gt; bool:
-        &quot;&quot;&quot;Verify payment signature from provider&quot;&quot;&quot;
-        data = f&quot;{invoice_payload}:{total_amount}:{currency}:{provider_payment_id}&quot;
+    ) -> bool:
+        """Verify payment signature from provider"""
+        data = f"{invoice_payload}:{total_amount}:{currency}:{provider_payment_id}"
         expected_signature = hmac.new(
             self.bot_token.encode(),
             data.encode(),
@@ -5484,22 +5484,22 @@ class PaymentVerifier:
         user_id: int,
         invoice_payload: str,
         amount: int
-    ) -&gt; tuple[bool, Optional[str]]:
-        &quot;&quot;&quot;Validate payment details before processing&quot;&quot;&quot;
+    ) -> tuple[bool, Optional[str]]:
+        """Validate payment details before processing"""
         # Check if user exists
         user = await db.get_user(user_id)
         if not user:
-            return False, &quot;User not found&quot;
+            return False, "User not found"
         
         # Check if payment already processed
         existing = await db.get_payment_by_payload(invoice_payload)
         if existing:
-            return False, &quot;Payment already processed&quot;
+            return False, "Payment already processed"
         
         # Validate amount
         expected_amount = await self._get_expected_amount(invoice_payload)
         if amount != expected_amount:
-            return False, f&quot;Amount mismatch: expected {expected_amount}, got {amount}&quot;
+            return False, f"Amount mismatch: expected {expected_amount}, got {amount}"
         
         return True, None
 
@@ -5537,53 +5537,53 @@ async def pre_checkout_callback(update, context):
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from prometheus_client import Counter, Histogram, Gauge, generate_latest
+            <pre class="language-python"><code class="language-python">from prometheus_client import Counter, Histogram, Gauge, generate_latest
 from functools import wraps
 import time
 
 # Define metrics
 message_counter = Counter(
-    &#x27;bot_messages_total&#x27;,
-    &#x27;Total messages processed&#x27;,
-    [&#x27;command&#x27;, &#x27;status&#x27;]
+    'bot_messages_total',
+    'Total messages processed',
+    ['command', 'status']
 )
 
 response_time = Histogram(
-    &#x27;bot_response_seconds&#x27;,
-    &#x27;Response time distribution&#x27;,
-    [&#x27;handler&#x27;]
+    'bot_response_seconds',
+    'Response time distribution',
+    ['handler']
 )
 
 active_users = Gauge(
-    &#x27;bot_active_users&#x27;,
-    &#x27;Number of active users&#x27;
+    'bot_active_users',
+    'Number of active users'
 )
 
 error_counter = Counter(
-    &#x27;bot_errors_total&#x27;,
-    &#x27;Total errors&#x27;,
-    [&#x27;error_type&#x27;]
+    'bot_errors_total',
+    'Total errors',
+    ['error_type']
 )
 
 class MetricsCollector:
     @staticmethod
-    def track_message(command: str, status: str = &quot;success&quot;):
-        &quot;&quot;&quot;Track message processing&quot;&quot;&quot;
+    def track_message(command: str, status: str = "success"):
+        """Track message processing"""
         message_counter.labels(command=command, status=status).inc()
     
     @staticmethod
     def track_response_time(handler_name: str):
-        &quot;&quot;&quot;Decorator to track handler response time&quot;&quot;&quot;
+        """Decorator to track handler response time"""
         def decorator(func):
             @wraps(func)
             async def wrapper(*args, **kwargs):
                 start = time.time()
                 try:
                     result = await func(*args, **kwargs)
-                    MetricsCollector.track_message(handler_name, &quot;success&quot;)
+                    MetricsCollector.track_message(handler_name, "success")
                     return result
                 except Exception as e:
-                    MetricsCollector.track_message(handler_name, &quot;error&quot;)
+                    MetricsCollector.track_message(handler_name, "error")
                     error_counter.labels(error_type=type(e).__name__).inc()
                     raise
                 finally:
@@ -5594,7 +5594,7 @@ class MetricsCollector:
     
     @staticmethod
     async def update_active_users():
-        &quot;&quot;&quot;Update active users gauge&quot;&quot;&quot;
+        """Update active users gauge"""
         count = await db.count_active_users(minutes=5)
         active_users.set(count)
 
@@ -5602,17 +5602,17 @@ class MetricsCollector:
 from fastapi import FastAPI, Response
 app = FastAPI()
 
-@app.get(&quot;/metrics&quot;)
+@app.get("/metrics")
 async def metrics():
     return Response(
         content=generate_latest(),
-        media_type=&quot;text/plain&quot;
+        media_type="text/plain"
     )
 
 # Usage
-@MetricsCollector.track_response_time(&quot;start_command&quot;)
+@MetricsCollector.track_response_time("start_command")
 async def start_command(update, context):
-    await update.message.reply_text(&quot;Hello!&quot;)</code></pre>
+    await update.message.reply_text("Hello!")</code></pre>
           </div>
         </div>
 
@@ -5625,7 +5625,7 @@ async def start_command(update, context):
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from collections import defaultdict
+            <pre class="language-python"><code class="language-python">from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Dict, List
 import json
@@ -5636,45 +5636,45 @@ class CustomMetrics:
         self.aggregations: Dict[str, float] = {}
     
     def record(self, metric_name: str, value: float, tags: dict = None):
-        &quot;&quot;&quot;Record a metric value with optional tags&quot;&quot;&quot;
+        """Record a metric value with optional tags"""
         self.metrics[metric_name].append({
-            &quot;value&quot;: value,
-            &quot;timestamp&quot;: datetime.now().isoformat(),
-            &quot;tags&quot;: tags or {}
+            "value": value,
+            "timestamp": datetime.now().isoformat(),
+            "tags": tags or {}
         })
         
         # Keep only last hour of data
         cutoff = datetime.now() - timedelta(hours=1)
         self.metrics[metric_name] = [
             m for m in self.metrics[metric_name]
-            if datetime.fromisoformat(m[&quot;timestamp&quot;]) &gt; cutoff
+            if datetime.fromisoformat(m["timestamp"]) > cutoff
         ]
     
-    def get_average(self, metric_name: str, minutes: int = 5) -&gt; float:
-        &quot;&quot;&quot;Get average value over last N minutes&quot;&quot;&quot;
+    def get_average(self, metric_name: str, minutes: int = 5) -> float:
+        """Get average value over last N minutes"""
         cutoff = datetime.now() - timedelta(minutes=minutes)
         values = [
-            m[&quot;value&quot;] for m in self.metrics.get(metric_name, [])
-            if datetime.fromisoformat(m[&quot;timestamp&quot;]) &gt; cutoff
+            m["value"] for m in self.metrics.get(metric_name, [])
+            if datetime.fromisoformat(m["timestamp"]) > cutoff
         ]
         return sum(values) / len(values) if values else 0
     
-    def get_percentile(self, metric_name: str, percentile: int) -&gt; float:
-        &quot;&quot;&quot;Get percentile value (e.g., 95th percentile)&quot;&quot;&quot;
-        values = sorted([m[&quot;value&quot;] for m in self.metrics.get(metric_name, [])])
+    def get_percentile(self, metric_name: str, percentile: int) -> float:
+        """Get percentile value (e.g., 95th percentile)"""
+        values = sorted([m["value"] for m in self.metrics.get(metric_name, [])])
         if not values:
             return 0
         index = int(len(values) * percentile / 100)
         return values[min(index, len(values) - 1)]
     
-    def export_summary(self) -&gt; dict:
-        &quot;&quot;&quot;Export metrics summary&quot;&quot;&quot;
+    def export_summary(self) -> dict:
+        """Export metrics summary"""
         return {
             name: {
-                &quot;count&quot;: len(values),
-                &quot;avg&quot;: self.get_average(name, minutes=60),
-                &quot;p95&quot;: self.get_percentile(name, 95),
-                &quot;p99&quot;: self.get_percentile(name, 99)
+                "count": len(values),
+                "avg": self.get_average(name, minutes=60),
+                "p95": self.get_percentile(name, 95),
+                "p99": self.get_percentile(name, 99)
             }
             for name, values in self.metrics.items()
         }
@@ -5683,12 +5683,12 @@ class CustomMetrics:
 metrics = CustomMetrics()
 
 # Track custom metric
-metrics.record(&quot;api_latency_ms&quot;, 45.2, tags={&quot;endpoint&quot;: &quot;/users&quot;})
-metrics.record(&quot;cache_hit_rate&quot;, 0.85)
+metrics.record("api_latency_ms", 45.2, tags={"endpoint": "/users"})
+metrics.record("cache_hit_rate", 0.85)
 
 # Get insights
-avg_latency = metrics.get_average(&quot;api_latency_ms&quot;, minutes=5)
-p95_latency = metrics.get_percentile(&quot;api_latency_ms&quot;, 95)</code></pre>
+avg_latency = metrics.get_average("api_latency_ms", minutes=5)
+p95_latency = metrics.get_percentile("api_latency_ms", 95)</code></pre>
           </div>
         </div>
 
@@ -5701,7 +5701,7 @@ p95_latency = metrics.get_percentile(&quot;api_latency_ms&quot;, 95)</code></pre
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from functools import wraps
+            <pre class="language-python"><code class="language-python">from functools import wraps
 import time
 from typing import Optional, Callable
 import asyncio
@@ -5717,9 +5717,9 @@ class PerformanceTracker:
         slow_threshold_ms: Optional[int] = None,
         alert_callback: Optional[Callable] = None
     ):
-        &quot;&quot;&quot;Decorator to track function performance&quot;&quot;&quot;
+        """Decorator to track function performance"""
         def decorator(func):
-            name = metric_name or f&quot;{func.__module__}.{func.__name__}&quot;
+            name = metric_name or f"{func.__module__}.{func.__name__}"
             
             @wraps(func)
             async def wrapper(*args, **kwargs):
@@ -5737,19 +5737,19 @@ class PerformanceTracker:
                     
                     # Record metric
                     self.metrics.record(
-                        f&quot;{name}.duration_ms&quot;,
+                        f"{name}.duration_ms",
                         duration_ms,
                         tags={
-                            &quot;success&quot;: exception is None,
-                            &quot;error_type&quot;: type(exception).__name__ if exception else None
+                            "success": exception is None,
+                            "error_type": type(exception).__name__ if exception else None
                         }
                     )
                     
                     # Alert if slow
-                    if slow_threshold_ms and duration_ms &gt; slow_threshold_ms:
+                    if slow_threshold_ms and duration_ms > slow_threshold_ms:
                         logger.warning(
-                            f&quot;Slow execution: {name} took {duration_ms:.2f}ms &quot;
-                            f&quot;(threshold: {slow_threshold_ms}ms)&quot;
+                            f"Slow execution: {name} took {duration_ms:.2f}ms "
+                            f"(threshold: {slow_threshold_ms}ms)"
                         )
                         
                         if alert_callback:
@@ -5766,8 +5766,8 @@ tracker = PerformanceTracker(metrics)
 async def send_alert(func_name, duration, threshold):
     await bot.send_message(
         ADMIN_CHAT_ID,
-        f&quot;⚠️ Slow function: {func_name}\n&quot;
-        f&quot;Duration: {duration:.2f}ms (threshold: {threshold}ms)&quot;
+        f"⚠️ Slow function: {func_name}\n"
+        f"Duration: {duration:.2f}ms (threshold: {threshold}ms)"
     )
 
 @tracker.track(slow_threshold_ms=1000, alert_callback=send_alert)
@@ -5795,7 +5795,7 @@ async def process_user_request(user_id: int):
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from pydantic import BaseSettings, validator, SecretStr
+            <pre class="language-python"><code class="language-python">from pydantic import BaseSettings, validator, SecretStr
 from typing import Optional, List
 import os
 
@@ -5822,42 +5822,42 @@ class Settings(BaseSettings):
     # API Keys
     openai_api_key: Optional[SecretStr] = None
     
-    @validator(&#x27;bot_token&#x27;)
+    @validator('bot_token')
     def validate_bot_token(cls, v):
         token = v.get_secret_value()
-        if not token or &#x27;:&#x27; not in token:
-            raise ValueError(&#x27;Invalid bot token format&#x27;)
+        if not token or ':' not in token:
+            raise ValueError('Invalid bot token format')
         return v
     
-    @validator(&#x27;webhook_url&#x27;)
+    @validator('webhook_url')
     def validate_webhook_url(cls, v):
-        if v and not v.startswith(&#x27;https://&#x27;):
-            raise ValueError(&#x27;Webhook URL must use HTTPS&#x27;)
+        if v and not v.startswith('https://'):
+            raise ValueError('Webhook URL must use HTTPS')
         return v
     
-    @validator(&#x27;admin_user_ids&#x27;, pre=True)
+    @validator('admin_user_ids', pre=True)
     def parse_admin_ids(cls, v):
         if isinstance(v, str):
-            return [int(x.strip()) for x in v.split(&#x27;,&#x27;) if x.strip()]
+            return [int(x.strip()) for x in v.split(',') if x.strip()]
         return v
     
-    @validator(&#x27;enable_payments&#x27;)
+    @validator('enable_payments')
     def validate_payment_config(cls, v, values):
-        if v and not values.get(&#x27;payment_provider_token&#x27;):
-            raise ValueError(&#x27;payment_provider_token required when payments enabled&#x27;)
+        if v and not values.get('payment_provider_token'):
+            raise ValueError('payment_provider_token required when payments enabled')
         return v
     
     class Config:
-        env_file = &#x27;.env&#x27;
-        env_file_encoding = &#x27;utf-8&#x27;
+        env_file = '.env'
+        env_file_encoding = 'utf-8'
         case_sensitive = False
 
 # Usage
 try:
     settings = Settings()
-    print(&quot;✅ Configuration loaded successfully&quot;)
+    print("✅ Configuration loaded successfully")
 except Exception as e:
-    print(f&quot;❌ Configuration error: {e}&quot;)
+    print(f"❌ Configuration error: {e}")
     exit(1)
 
 # Access values
@@ -5875,7 +5875,7 @@ ADMIN_IDS = settings.admin_user_ids</code></pre>
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">import asyncio
+            <pre class="language-python"><code class="language-python">import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 
@@ -5891,55 +5891,55 @@ class SecretManager:
         rotation_interval: Optional[timedelta] = None,
         rotation_callback: Optional[callable] = None
     ):
-        &quot;&quot;&quot;Register a secret with optional rotation&quot;&quot;&quot;
+        """Register a secret with optional rotation"""
         self.secrets[name] = {
-            &quot;value&quot;: value,
-            &quot;created_at&quot;: datetime.now(),
-            &quot;rotation_interval&quot;: rotation_interval,
-            &quot;last_rotated&quot;: datetime.now()
+            "value": value,
+            "created_at": datetime.now(),
+            "rotation_interval": rotation_interval,
+            "last_rotated": datetime.now()
         }
         
         if rotation_callback:
             self.rotation_callbacks[name] = rotation_callback
     
-    def get_secret(self, name: str) -&gt; str:
-        &quot;&quot;&quot;Get current secret value&quot;&quot;&quot;
+    def get_secret(self, name: str) -> str:
+        """Get current secret value"""
         if name not in self.secrets:
-            raise KeyError(f&quot;Secret &#x27;{name}&#x27; not found&quot;)
-        return self.secrets[name][&quot;value&quot;]
+            raise KeyError(f"Secret '{name}' not found")
+        return self.secrets[name]["value"]
     
     async def rotate_secret(self, name: str, new_value: str):
-        &quot;&quot;&quot;Rotate a secret&quot;&quot;&quot;
+        """Rotate a secret"""
         if name not in self.secrets:
-            raise KeyError(f&quot;Secret &#x27;{name}&#x27; not found&quot;)
+            raise KeyError(f"Secret '{name}' not found")
         
-        old_value = self.secrets[name][&quot;value&quot;]
+        old_value = self.secrets[name]["value"]
         
         # Update secret
         self.secrets[name].update({
-            &quot;value&quot;: new_value,
-            &quot;last_rotated&quot;: datetime.now()
+            "value": new_value,
+            "last_rotated": datetime.now()
         })
         
         # Call rotation callback if registered
         if name in self.rotation_callbacks:
             await self.rotation_callbacks[name](old_value, new_value)
         
-        logger.info(f&quot;Secret &#x27;{name}&#x27; rotated successfully&quot;)
+        logger.info(f"Secret '{name}' rotated successfully")
     
     async def check_rotation_needed(self):
-        &quot;&quot;&quot;Background task to check if secrets need rotation&quot;&quot;&quot;
+        """Background task to check if secrets need rotation"""
         while True:
             for name, secret in self.secrets.items():
-                interval = secret.get(&quot;rotation_interval&quot;)
+                interval = secret.get("rotation_interval")
                 if not interval:
                     continue
                 
-                time_since_rotation = datetime.now() - secret[&quot;last_rotated&quot;]
-                if time_since_rotation &gt; interval:
+                time_since_rotation = datetime.now() - secret["last_rotated"]
+                if time_since_rotation > interval:
                     logger.warning(
-                        f&quot;Secret &#x27;{name}&#x27; needs rotation &quot;
-                        f&quot;(last rotated {time_since_rotation.days} days ago)&quot;
+                        f"Secret '{name}' needs rotation "
+                        f"(last rotated {time_since_rotation.days} days ago)"
                     )
             
             await asyncio.sleep(3600)  # Check every hour
@@ -5955,8 +5955,8 @@ async def on_webhook_secret_rotation(old_secret, new_secret):
     )
 
 secret_manager.register_secret(
-    &quot;webhook_secret&quot;,
-    os.getenv(&quot;WEBHOOK_SECRET&quot;),
+    "webhook_secret",
+    os.getenv("WEBHOOK_SECRET"),
     rotation_interval=timedelta(days=30),
     rotation_callback=on_webhook_secret_rotation
 )</code></pre>
@@ -5972,44 +5972,44 @@ secret_manager.register_secret(
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from enum import Enum
+            <pre class="language-python"><code class="language-python">from enum import Enum
 from pydantic import BaseSettings
 from typing import Dict, Any
 
 class Environment(str, Enum):
-    DEVELOPMENT = &quot;development&quot;
-    STAGING = &quot;staging&quot;
-    PRODUCTION = &quot;production&quot;
+    DEVELOPMENT = "development"
+    STAGING = "staging"
+    PRODUCTION = "production"
 
 class BaseConfig(BaseSettings):
     environment: Environment = Environment.DEVELOPMENT
     debug: bool = False
     
     class Config:
-        env_file = &#x27;.env&#x27;
+        env_file = '.env'
 
 class DevelopmentConfig(BaseConfig):
     debug: bool = True
-    database_url: str = &quot;sqlite:///dev.db&quot;
-    log_level: str = &quot;DEBUG&quot;
+    database_url: str = "sqlite:///dev.db"
+    log_level: str = "DEBUG"
     enable_sentry: bool = False
 
 class StagingConfig(BaseConfig):
     database_url: str
-    log_level: str = &quot;INFO&quot;
+    log_level: str = "INFO"
     enable_sentry: bool = True
-    sentry_environment: str = &quot;staging&quot;
+    sentry_environment: str = "staging"
 
 class ProductionConfig(BaseConfig):
     database_url: str
-    log_level: str = &quot;WARNING&quot;
+    log_level: str = "WARNING"
     enable_sentry: bool = True
-    sentry_environment: str = &quot;production&quot;
+    sentry_environment: str = "production"
     require_https: bool = True
 
-def get_config() -&gt; BaseConfig:
-    &quot;&quot;&quot;Get configuration based on environment&quot;&quot;&quot;
-    env = os.getenv(&quot;ENVIRONMENT&quot;, &quot;development&quot;).lower()
+def get_config() -> BaseConfig:
+    """Get configuration based on environment"""
+    env = os.getenv("ENVIRONMENT", "development").lower()
     
     configs = {
         Environment.DEVELOPMENT: DevelopmentConfig,
@@ -6049,15 +6049,15 @@ logger.setLevel(config.log_level)</code></pre>
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from pydantic import BaseModel, Field, validator
+            <pre class="language-python"><code class="language-python">from pydantic import BaseModel, Field, validator
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
 
 class UserRole(str, Enum):
-    USER = &quot;user&quot;
-    ADMIN = &quot;admin&quot;
-    MODERATOR = &quot;moderator&quot;
+    USER = "user"
+    ADMIN = "admin"
+    MODERATOR = "moderator"
 
 class User(BaseModel):
     id: int
@@ -6067,10 +6067,10 @@ class User(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
     is_active: bool = True
     
-    @validator(&#x27;username&#x27;)
+    @validator('username')
     def validate_username(cls, v):
-        if v and (len(v) &lt; 3 or len(v) &gt; 32):
-            raise ValueError(&#x27;Username must be 3-32 characters&#x27;)
+        if v and (len(v) < 3 or len(v) > 32):
+            raise ValueError('Username must be 3-32 characters')
         return v
 
 class Message(BaseModel):
@@ -6100,8 +6100,8 @@ class ChatStatistics(BaseModel):
 try:
     user = User(
         id=123,
-        username=&quot;ab&quot;,  # Too short - will raise ValidationError
-        first_name=&quot;John&quot;
+        username="ab",  # Too short - will raise ValidationError
+        first_name="John"
     )
 except ValidationError as e:
     print(e.json())
@@ -6111,7 +6111,7 @@ user_dict = user.dict()
 user_json = user.json()
 
 # Parse from dict
-user = User.parse_obj({&quot;id&quot;: 123, &quot;first_name&quot;: &quot;John&quot;})</code></pre>
+user = User.parse_obj({"id": 123, "first_name": "John"})</code></pre>
           </div>
         </div>
 
@@ -6124,7 +6124,7 @@ user = User.parse_obj({&quot;id&quot;: 123, &quot;first_name&quot;: &quot;John&q
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from pydantic import BaseModel, validator, root_validator
+            <pre class="language-python"><code class="language-python">from pydantic import BaseModel, validator, root_validator
 from typing import Optional
 import re
 
@@ -6134,38 +6134,38 @@ class BotSettings(BaseModel):
     max_message_length: int = 4096
     rate_limit: int = 30
     
-    @validator(&#x27;bot_token&#x27;)
+    @validator('bot_token')
     def validate_token_format(cls, v):
-        &quot;&quot;&quot;Validate Telegram bot token format&quot;&quot;&quot;
-        pattern = r&#x27;^\d+:[A-Za-z0-9_-]{35}$&#x27;
+        """Validate Telegram bot token format"""
+        pattern = r'^\d+:[A-Za-z0-9_-]{35}$'
         if not re.match(pattern, v):
-            raise ValueError(&#x27;Invalid bot token format&#x27;)
+            raise ValueError('Invalid bot token format')
         return v
     
-    @validator(&#x27;webhook_url&#x27;)
+    @validator('webhook_url')
     def validate_webhook(cls, v):
-        &quot;&quot;&quot;Ensure webhook uses HTTPS&quot;&quot;&quot;
-        if v and not v.startswith(&#x27;https://&#x27;):
-            raise ValueError(&#x27;Webhook must use HTTPS&#x27;)
+        """Ensure webhook uses HTTPS"""
+        if v and not v.startswith('https://'):
+            raise ValueError('Webhook must use HTTPS')
         return v
     
-    @validator(&#x27;rate_limit&#x27;)
+    @validator('rate_limit')
     def validate_rate_limit(cls, v):
-        &quot;&quot;&quot;Ensure reasonable rate limit&quot;&quot;&quot;
-        if v &lt; 1 or v &gt; 100:
-            raise ValueError(&#x27;Rate limit must be between 1-100&#x27;)
+        """Ensure reasonable rate limit"""
+        if v < 1 or v > 100:
+            raise ValueError('Rate limit must be between 1-100')
         return v
     
     @root_validator
     def validate_settings(cls, values):
-        &quot;&quot;&quot;Cross-field validation&quot;&quot;&quot;
-        webhook = values.get(&#x27;webhook_url&#x27;)
-        token = values.get(&#x27;bot_token&#x27;)
+        """Cross-field validation"""
+        webhook = values.get('webhook_url')
+        token = values.get('bot_token')
         
         if webhook:
-            # Ensure webhook domain doesn&#x27;t contain bot token
-            if token and token.split(&#x27;:&#x27;)[0] in webhook:
-                raise ValueError(&#x27;Webhook URL should not contain bot token&#x27;)
+            # Ensure webhook domain doesn't contain bot token
+            if token and token.split(':')[0] in webhook:
+                raise ValueError('Webhook URL should not contain bot token')
         
         return values
 
@@ -6174,29 +6174,29 @@ class UserRegistration(BaseModel):
     phone: Optional[str] = None
     age: int
     
-    @validator(&#x27;email&#x27;)
+    @validator('email')
     def validate_email(cls, v):
-        email_pattern = r&#x27;^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$&#x27;
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(email_pattern, v):
-            raise ValueError(&#x27;Invalid email format&#x27;)
+            raise ValueError('Invalid email format')
         return v.lower()
     
-    @validator(&#x27;phone&#x27;)
+    @validator('phone')
     def validate_phone(cls, v):
         if v:
             # Remove common separators
-            cleaned = re.sub(r&#x27;[-()\s]&#x27;, &#x27;&#x27;, v)
-            if not cleaned.isdigit() or len(cleaned) &lt; 10:
-                raise ValueError(&#x27;Invalid phone number&#x27;)
+            cleaned = re.sub(r'[-()\s]', '', v)
+            if not cleaned.isdigit() or len(cleaned) < 10:
+                raise ValueError('Invalid phone number')
             return cleaned
         return v
     
-    @validator(&#x27;age&#x27;)
+    @validator('age')
     def validate_age(cls, v):
-        if v &lt; 13:
-            raise ValueError(&#x27;Must be at least 13 years old&#x27;)
-        if v &gt; 120:
-            raise ValueError(&#x27;Invalid age&#x27;)
+        if v < 13:
+            raise ValueError('Must be at least 13 years old')
+        if v > 120:
+            raise ValueError('Invalid age')
         return v</code></pre>
           </div>
         </div>
@@ -6210,14 +6210,14 @@ class UserRegistration(BaseModel):
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
-            <pre class="language-python" tabindex="0"><code class="language-python">from pydantic import BaseModel
+            <pre class="language-python"><code class="language-python">from pydantic import BaseModel
 from typing import Any, Type, List
 import json
 from datetime import datetime, date
 from decimal import Decimal
 
 class EnhancedJSONEncoder(json.JSONEncoder):
-    &quot;&quot;&quot;JSON encoder with support for datetime, Decimal, etc.&quot;&quot;&quot;
+    """JSON encoder with support for datetime, Decimal, etc."""
     def default(self, obj):
         if isinstance(obj, (datetime, date)):
             return obj.isoformat()
@@ -6229,22 +6229,22 @@ class EnhancedJSONEncoder(json.JSONEncoder):
 
 class SerializationHelper:
     @staticmethod
-    def to_json(obj: Any, pretty: bool = False) -&gt; str:
-        &quot;&quot;&quot;Convert object to JSON string&quot;&quot;&quot;
+    def to_json(obj: Any, pretty: bool = False) -> str:
+        """Convert object to JSON string"""
         indent = 2 if pretty else None
         return json.dumps(obj, cls=EnhancedJSONEncoder, indent=indent)
     
     @staticmethod
-    def from_json(data: str, model: Type[BaseModel]) -&gt; BaseModel:
-        &quot;&quot;&quot;Parse JSON to Pydantic model&quot;&quot;&quot;
+    def from_json(data: str, model: Type[BaseModel]) -> BaseModel:
+        """Parse JSON to Pydantic model"""
         return model.parse_raw(data)
     
     @staticmethod
     def batch_serialize(
         items: List[BaseModel],
         exclude_none: bool = True
-    ) -&gt; List[dict]:
-        &quot;&quot;&quot;Serialize list of models&quot;&quot;&quot;
+    ) -> List[dict]:
+        """Serialize list of models"""
         return [
             item.dict(exclude_none=exclude_none)
             for item in items
@@ -6255,8 +6255,8 @@ class SerializationHelper:
         data: dict,
         model: Type[BaseModel],
         strict: bool = True
-    ) -&gt; BaseModel:
-        &quot;&quot;&quot;Convert nested dict to model with error handling&quot;&quot;&quot;
+    ) -> BaseModel:
+        """Convert nested dict to model with error handling"""
         try:
             return model.parse_obj(data)
         except ValidationError as e:
@@ -6281,8 +6281,8 @@ class UserProfile(BaseModel):
 
 user = UserProfile(
     id=1,
-    name=&quot;John&quot;,
-    email=&quot;john@example.com&quot;,
+    name="John",
+    email="john@example.com",
     created_at=datetime.now()
 )
 
