@@ -3821,6 +3821,12 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
       (function() {
         'use strict';
         
+        // Prevent this script from being copied
+        const scriptTag = document.currentScript;
+        if (scriptTag) {
+          scriptTag.setAttribute('data-no-copy', 'true');
+        }
+        
         // Make copyCode available globally immediately (before DOMContentLoaded)
         window.copyCode = function(button) {
           try {
@@ -3831,16 +3837,44 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
               return;
             }
             
-            // Find the pre element (should be the next sibling of the button)
-            let preElement = button.nextElementSibling;
+            // Find the pre element - must be a direct child of snippet-content
+            // and must NOT be inside a script tag
+            let preElement = null;
             
-            // If next sibling is not PRE, try to find it
-            if (!preElement || preElement.tagName !== 'PRE') {
-              preElement = snippetContent.querySelector('pre');
+            // First try: next sibling of button (most common case)
+            let sibling = button.nextElementSibling;
+            if (sibling && sibling.tagName === 'PRE') {
+              // Verify it's not inside a script
+              if (!sibling.closest('script') && !sibling.closest('[data-no-copy="true"]')) {
+                preElement = sibling;
+              }
+            }
+            
+            // Second try: find first PRE that is a direct child of snippet-content
+            if (!preElement) {
+              const children = Array.from(snippetContent.children);
+              for (let i = 0; i < children.length; i++) {
+                const child = children[i];
+                if (child.tagName === 'PRE') {
+                  // Verify it's not inside a script and is a direct child
+                  if (!child.closest('script') && 
+                      !child.closest('[data-no-copy="true"]') &&
+                      child.parentElement === snippetContent) {
+                    preElement = child;
+                    break;
+                  }
+                }
+              }
             }
             
             if (!preElement || preElement.tagName !== 'PRE') {
-              console.error('Could not find pre element');
+              console.error('Could not find valid pre element in snippet-content');
+              return;
+            }
+            
+            // Final verification - make sure pre is not inside script
+            if (preElement.closest('script') || preElement.closest('[data-no-copy="true"]')) {
+              console.error('Pre element is inside script tag or marked as no-copy - skipping');
               return;
             }
             
@@ -3851,6 +3885,12 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
               return;
             }
             
+            // Final verification for code element
+            if (code.closest('script') || code.closest('[data-no-copy="true"]')) {
+              console.error('Code element is inside script tag or marked as no-copy - skipping');
+              return;
+            }
+            
             // Get text content - use cloneNode to avoid affecting the original
             const codeClone = code.cloneNode(true);
             
@@ -3858,22 +3898,34 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
             const spans = codeClone.querySelectorAll('span');
             spans.forEach(span => {
               const parent = span.parentNode;
-              while (span.firstChild) {
-                parent.insertBefore(span.firstChild, span);
+              if (parent) {
+                while (span.firstChild) {
+                  parent.insertBefore(span.firstChild, span);
+                }
+                parent.removeChild(span);
               }
-              parent.removeChild(span);
             });
             
             // Get clean text content
             let text = codeClone.textContent || codeClone.innerText || '';
             
-            // Additional cleanup - remove any remaining HTML entities and script tags
+            // Additional cleanup - remove any script-related content that might have leaked
+            // But be careful not to remove legitimate code that contains these patterns
+            // Only remove if it looks like actual script tags
             text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
             text = text.replace(/&lt;script[^&]*&gt;[\s\S]*?&lt;\/script&gt;/gi, '');
             text = text.trim();
             
-            if (!text) {
-              console.error('No text to copy');
+            // Validate that we have meaningful content (at least 10 characters)
+            if (!text || text.length < 10) {
+              console.error('No valid text to copy or text too short');
+              return;
+            }
+            
+            // Additional safety check - if text contains our script function signature, skip it
+            if (text.includes('window.copyCode = function') || 
+                text.includes('document.addEventListener(\'DOMContentLoaded\'')) {
+              console.error('Detected script code in text - skipping copy');
               return;
             }
             
