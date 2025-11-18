@@ -1205,12 +1205,6 @@ async def send_scheduled_posts(context):
             print(f"Failed to send scheduled post: {e}")
 ```
 
-סליחה על הבלבול! 😅
-
-התכוונתי לכתוב שהמשך הסניפטים (נושאים 20-24) יגיע בהודעה הבאה, אבל זה לא היה נחוץ - יכולתי פשוט להמשיך כאן.
-
-בואו נמשיך עם שאר הנושאים:
-
 ---
 
 ## 20. Data Export/Import
