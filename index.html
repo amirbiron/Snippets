@@ -2869,7 +2869,7 @@ def track_performance(operation: str, labels: Optional[Dict[str, str]] = None):
         <div class="snippet" id="snippet-9-19">
           <div class="snippet-header">
             <h3 class="snippet-title">9.19 הדגשת טווחים בתוצאות חיפוש (highlightSnippet)</h3>
-            <p class="snippet-description"><strong>למה זה שימושי:</strong> מקבל טקסט גולמי ומדגיש טווחים רלוונטיים עם `<mark>` מבלי לשבור HTML.</p>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מקבל טקסט גולמי ומדגיש טווחים רלוונטיים עם `&lt;mark&gt;` מבלי לשבור HTML.</p>
           </div>
           <div class="snippet-content">
             <button class="copy-button" onclick="copyCode(this)">העתק</button>
@@ -3805,7 +3805,7 @@ def validate_file(file_data: bytes, filename: str, content_type: str) -> None:
             raise ValidationError(f"Invalid image file: {str(e)}")
     
     # Check for malicious content
-    if b'<script' in file_data.lower() or b'javascript:' in file_data.lower():
+    if b'&lt;script' in file_data.lower() or b'javascript:' in file_data.lower():
         raise ValidationError("File contains potentially malicious content")</code></pre>
           </div>
         </div>
