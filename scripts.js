@@ -203,12 +203,14 @@
     const searchInput = document.getElementById('searchInput');
     const snippets = document.querySelectorAll('.snippet');
     const categories = document.querySelectorAll('.category');
+    const tocCategories = document.querySelectorAll('.toc-category');
     const noResults = document.getElementById('noResults');
 
     if (searchInput) {
       searchInput.addEventListener('input', function(e) {
         const searchTerm = e.target.value.toLowerCase().trim();
         let visibleCount = 0;
+        const matchingSnippetIds = new Set();
 
         if (searchTerm === '') {
           // Show all
@@ -218,6 +220,13 @@
           categories.forEach(category => {
             category.classList.remove('no-matches');
           });
+          // Reset TOC
+          tocCategories.forEach(cat => {
+            cat.style.display = '';
+            const links = cat.querySelectorAll('li');
+            links.forEach(li => li.style.display = '');
+          });
+          
           if (noResults) {
             noResults.classList.remove('show');
           }
@@ -256,6 +265,9 @@
           if (matches) {
             snippet.classList.remove('filtered-out');
             visibleCount++;
+            if (snippet.id) {
+              matchingSnippetIds.add(snippet.id);
+            }
           } else {
             snippet.classList.add('filtered-out');
           }
@@ -268,6 +280,36 @@
             category.classList.add('no-matches');
           } else {
             category.classList.remove('no-matches');
+          }
+        });
+
+        // Filter TOC
+        tocCategories.forEach(cat => {
+          let visibleLinks = 0;
+          const links = cat.querySelectorAll('li');
+          links.forEach(li => {
+            const a = li.querySelector('a');
+            if (!a) return;
+            
+            const href = a.getAttribute('href');
+            const snippetId = href ? href.substring(1) : '';
+            const text = a.textContent.toLowerCase();
+            
+            // Show if text matches OR if the corresponding snippet matched content search
+            const isMatch = text.includes(searchTerm) || matchingSnippetIds.has(snippetId);
+            
+            if (isMatch) {
+              li.style.display = '';
+              visibleLinks++;
+            } else {
+              li.style.display = 'none';
+            }
+          });
+          
+          if (visibleLinks === 0) {
+            cat.style.display = 'none';
+          } else {
+            cat.style.display = '';
           }
         });
 
