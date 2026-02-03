@@ -4,7 +4,7 @@
 
 ---
 
-## Placeholder לטלפון בטלגרם
+## 1. Placeholder לטלפון בטלגרם
 
 **למה זה שימושי:** טלגרם לא מספק מספר טלפון בהכרח, אבל DB דורש phone_number. יוצר מזהה יציב שלא יפוצץ את הDB.
 
@@ -33,7 +33,7 @@ def _telegram_phone_placeholder(telegram_chat_id: str) -> str:
 
 ---
 
-## חילוץ Chat ID מסוגי עדכונים שונים
+## 2. חילוץ Chat ID מסוגי עדכונים שונים
 
 **למה זה שימושי:** טלגרם שולח עדכונים בפורמטים שונים (הודעות, callback queries). פונקציה אחת שתמיד מחזירה chat_id נכון.
 
@@ -62,7 +62,7 @@ def _resolve_telegram_chat_id(update: "TelegramUpdate") -> str | None:
 
 ---
 
-## Pydantic עם Field Alias למילים שמורות
+## 3. Pydantic עם Field Alias למילים שמורות
 
 **למה זה שימושי:** ה-JSON של טלגרם מכיל שדה `from` שזו מילה שמורה בפייתון. Field alias פותר את זה בצורה אלגנטית.
 
@@ -97,7 +97,7 @@ class TelegramCallbackQuery(BaseModel):
 
 ---
 
-## המרת HTML לפורמט וואטסאפ
+## 4. המרת HTML לפורמט וואטסאפ
 
 **למה זה שימושי:** כותבים הודעות ב-HTML אחיד, והפונקציה ממירה אוטומטית לפורמט של וואטסאפ (כוכביות, קווים תחתונים).
 
@@ -141,7 +141,7 @@ def convert_html_to_whatsapp(text: str) -> str:
 
 ---
 
-## פקודות אדמין עם Regex בעברית
+## 5. פקודות אדמין עם Regex בעברית
 
 **למה זה שימושי:** זיהוי פקודות בעברית מקבוצת מנהלים, עם תמיכה באימוג'י ובפורמטים גמישים ("אשר 123", "✅ אשר שליח 123").
 
@@ -175,7 +175,7 @@ async def handle_admin_group_command(db, text: str) -> Optional[str]:
 
 ---
 
-## Token מאובטח לקישורי Smart Link
+## 6. Token מאובטח לקישורי Smart Link
 
 **למה זה שימושי:** במקום לחשוף ID של משלוח בקישור (ניתן לנחש), יוצרים token אקראי שלא ניתן לניחוש.
 
@@ -219,7 +219,7 @@ async def capture_delivery_by_token(token: str, courier_id: int):
 
 ---
 
-## תפיסה אטומית עם נעילת שורות (Row Locks)
+## 7. תפיסה אטומית עם נעילת שורות (Row Locks)
 
 **למה זה שימושי:** מניעת race conditions - שני שליחים לא יכולים לתפוס אותו משלוח. גם מוודא שיש מספיק קרדיט לפני התפיסה.
 
@@ -289,7 +289,7 @@ async def capture_delivery(delivery_id: int, courier_id: int):
 
 ---
 
-## Backoff עם הגנת Overflow
+## 8. Backoff עם הגנת Overflow
 
 **למה זה שימושי:** חישוב backoff אקספוננציאלי בלי לפוצץ את הזיכרון כשretry_count גדול מדי.
 
@@ -332,7 +332,7 @@ def _calculate_backoff_seconds(
 
 ---
 
-## ניהול Event Loop ב-Celery Tasks
+## 9. ניהול Event Loop ב-Celery Tasks
 
 **למה זה שימושי:** Celery רץ sync אבל הקוד שלך async. ה-context manager מוודא ניקוי תקין של resources.
 
@@ -385,7 +385,7 @@ def process_outbox_messages():
 
 ---
 
-## עדכון JSON Field ב-SQLAlchemy
+## 10. עדכון JSON Field ב-SQLAlchemy
 
 **למה זה שימושי:** SQLAlchemy לא מזהה שינויים בתוך JSON field. חייבים ליצור dict חדש כדי לגרום ל-dirty flag.
 
@@ -419,7 +419,7 @@ async def transition_to(user_id: int, platform: str, new_state: str, context_upd
 
 ---
 
-## Double-Checked Locking ל-Singleton
+## 11. Double-Checked Locking ל-Singleton
 
 **למה זה שימושי:** Circuit breaker צריך להיות singleton, אבל חייבים תמיכה ב-thread safety (Celery workers).
 
@@ -456,7 +456,7 @@ assert cb1 is cb2  # True
 
 ---
 
-## מעברי State Machine מותרים
+## 12. מעברי State Machine מותרים
 
 **למה זה שימושי:** הגדרת מעברים חוקיים מונעת באגים - אי אפשר לדלג על שלבים בזרימה.
 
@@ -514,7 +514,7 @@ async def transition_to(user_id: int, new_state: str) -> bool:
 
 ---
 
-## Transactional Outbox Pattern
+## 13. Transactional Outbox Pattern
 
 **למה זה שימושי:** שומרים הודעות בDB באותה טרנזקציה עם הלוגיקה העסקית. Worker נפרד שולח - מבטיח שלא נאבד הודעות.
 
@@ -565,7 +565,7 @@ async def queue_delivery_broadcast(delivery: Delivery):
 
 ---
 
-## הבחנה בין קבוצות להודעות פרטיות
+## 14. הבחנה בין קבוצות להודעות פרטיות
 
 **למה זה שימושי:** בוואטסאפ צריך להבחין בין הודעות מקבוצות (admin group) להודעות פרטיות מלקוחות.
 
@@ -601,7 +601,7 @@ async def whatsapp_webhook(payload: WhatsAppWebhookPayload, db):
 
 ---
 
-## שליחה מקבילית עם סיכום תוצאות
+## 15. שליחה מקבילית עם סיכום תוצאות
 
 **למה זה שימושי:** שליחת broadcast לאלפי משתמשים - מקבילית ומהירה, עם ספירת הצלחות/כשלונות.
 
@@ -651,7 +651,7 @@ async def broadcast_to_couriers(message_text: str):
 
 ---
 
-## סטטוס "דביק" שלא ניתן לשנות
+## 16. סטטוס "דביק" שלא ניתן לשנות
 
 **למה זה שימושי:** משתמש BLOCKED לא יכול להפוך למאושר - הגנה מפני שגיאות אדמין.
 
@@ -687,7 +687,7 @@ async def _approve_courier(db, user_id: int) -> str:
 
 ---
 
-## מניעת התראות כפולות במעבר State
+## 17. מניעת התראות כפולות במעבר State
 
 **למה זה שימושי:** שמירת state קודם לפני טיפול - שולחים התראה רק במעבר הראשון ל-state חדש.
 
@@ -716,7 +716,7 @@ async def handle_courier_message(user, text, db):
 
 ---
 
-## כפתורי Inline עם Callback Data
+## 18. כפתורי Inline עם Callback Data
 
 **למה זה שימושי:** יצירת מקלדת inline לטלגרם - כפתורים שנשארים על ההודעה ושולחים callback_data.
 
@@ -759,7 +759,7 @@ async def send_telegram_message(chat_id: str, text: str, keyboard: list = None, 
 
 ---
 
-## Force State ללא ולידציה (איפוס)
+## 19. Force State ללא ולידציה (איפוס)
 
 **למה זה שימושי:** לפעמים צריך לאפס את המשתמש לתחילת הזרימה, בלי להתחשב במעברים המותרים.
 
