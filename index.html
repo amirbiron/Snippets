@@ -11593,6 +11593,1849 @@ config = load_config(
           </div>
         </div>
       </div>
+
+      <!-- Category 56: בוטים וזרימות טלגרם -->
+      <div class="category" id="category-56">
+        <div class="category-header">
+          <i class="fas fa-robot"></i>
+          <h2>בוטים וזרימות טלגרם</h2>
+        </div>
+
+        <div class="snippet" id="snippet-56-1">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.1 In-Memory Store עם TTL וגבלת גודל</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מאחסן נתונים זמניים (כמו תוצאות inline) עם ניקוי אוטומטי לפי זמן וגודל מקסימלי. מונע דליפת זיכרון.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import time
+
+INLINE_EXEC_STORE = {}
+INLINE_EXEC_TTL = 180  # 3 דקות
+INLINE_EXEC_MAX = 5000  # מקסימום רשומות
+
+def prune_inline_exec_store(now_ts: float | None = None) -&gt; tuple[int, int]:
+    """מסיר רשומות פגות תוקף ומגביל גודל מקסימלי.
+    מחזיר (expired_removed, trimmed_removed)."""
+    now = now_ts if now_ts else time.time()
+
+    # הסרת פגי תוקף
+    expired_keys = [
+        k for k, v in INLINE_EXEC_STORE.items()
+        if now - float(v.get("ts", 0)) &gt; INLINE_EXEC_TTL
+    ]
+    for k in expired_keys:
+        INLINE_EXEC_STORE.pop(k, None)
+
+    # הגבלת גודל - מחיקה לפי הישן ביותר
+    trimmed = 0
+    if len(INLINE_EXEC_STORE) &gt; INLINE_EXEC_MAX:
+        by_age = sorted(INLINE_EXEC_STORE.items(),
+                        key=lambda kv: float(kv[1].get("ts", 0)))
+        overflow = len(INLINE_EXEC_STORE) - INLINE_EXEC_MAX
+        for i in range(overflow):
+            INLINE_EXEC_STORE.pop(by_age[i][0], None)
+            trimmed += 1
+
+    return (len(expired_keys), trimmed)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-2">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.2 הזרקת פרמטרים דינמית לפי חתימת פונקציה</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מזהה אוטומטית אם פונקציה מצפה ל-update/context ומזריק אותם. מאפשר קריאה לפונקציות בסגנון PTB בצורה גמישה.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import inspect
+
+def inject_telegram_params(func, update, context, raw_args):
+    """מזהה פרמטרים בחתימה ומזריק update/context לפי הצורך."""
+    sig = inspect.signature(func)
+    param_names = list(sig.parameters.keys())
+
+    kw_args = {}
+
+    # הזרקת update אם נדרש
+    if "update" in param_names:
+        kw_args["update"] = update
+
+    # הזרקת context לפי שמות נפוצים
+    for name in ("context", "ctx"):
+        if name in param_names:
+            kw_args[name] = context
+            break
+
+    # העברת ארגומנטים דרך context.args (סגנון PTB)
+    if "update" in param_names or "context" in param_names:
+        prev_args = getattr(context, "args", None)
+        try:
+            context.args = [str(a) for a in raw_args]
+            return func(**kw_args), prev_args
+        finally:
+            context.args = prev_args
+
+    return func(*raw_args), None</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-3">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.3 התקנת חבילות חסרות אוטומטית</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> כשהקוד נכשל בגלל מודול חסר, מנסה להתקין אותו עם pip ולהריץ שוב. מאפשר למשתמשים להריץ קוד עם תלויות חדשות.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import re
+import asyncio
+import subprocess
+import sys
+
+SAFE_PIP_NAME_RE = re.compile(r'^(?![.-])[a-zA-Z0-9_.-]+$')
+
+def is_safe_pip_name(name: str) -&gt; bool:
+    """בדיקה שהשם בטוח להתקנה עם pip."""
+    return bool(SAFE_PIP_NAME_RE.match(name))
+
+async def run_with_auto_install(code, exec_func, update, max_attempts=3):
+    """מריץ קוד עם התקנה אוטומטית של מודולים חסרים."""
+    attempts = 0
+    out, err, tb = await exec_func(code)
+
+    while tb and "ModuleNotFoundError" in tb and attempts &lt; max_attempts:
+        match = re.search(r"ModuleNotFoundError: No module named '([^']+)'", tb)
+        if not match:
+            break
+
+        missing = match.group(1)
+        if not is_safe_pip_name(missing):
+            await update.message.reply_text(f"❌ שם מודול לא תקין: '{missing}'")
+            break
+
+        await update.message.reply_text(f"📦 מתקין '{missing}'...")
+        try:
+            await asyncio.to_thread(
+                subprocess.run,
+                [sys.executable, "-m", "pip", "install", missing],
+                check=True, timeout=120
+            )
+            await update.message.reply_text(f"✅ הותקן. מריץ שוב...")
+        except Exception as e:
+            await update.message.reply_text(f"❌ כשל בהתקנה: {e}")
+            break
+
+        attempts += 1
+        out, err, tb = await exec_func(code)
+
+    return out, err, tb</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-4">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.4 הערכת ביטוי אחרון (כמו REPL)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> אם הקוד לא מדפיס פלט, מעריך את הביטוי האחרון ומציג את התוצאה - בדיוק כמו Python REPL.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import ast
+import inspect
+
+async def eval_last_expression(code: str, context: dict) -&gt; str | None:
+    """מעריך את הביטוי האחרון בקוד אם אין פלט."""
+    try:
+        mod = ast.parse(code, mode="exec")
+        if not getattr(mod, "body", None):
+            return None
+
+        last = mod.body[-1]
+        if not isinstance(last, ast.Expr):
+            return None
+
+        expr_code = compile(ast.Expression(last.value),
+                           filename="&lt;repl&gt;", mode="eval")
+        result = eval(expr_code, context, context)
+
+        # תמיכה ב-async
+        if inspect.isawaitable(result):
+            result = await result
+
+        return str(result) if result is not None else None
+    except Exception:
+        return None</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-5">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.5 פאגינציה ל-Inline Query עם טוקנים</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מנהל פאגינציה לתוצאות inline עם טוקנים ייחודיים לכל תוצאה. מאפשר תפריטים גדולים ומעקב אחר בחירות.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import hashlib
+import secrets
+from telegram import InlineQueryResultArticle, InputTextMessageContent
+
+PAGE_SIZE = 10
+EXEC_STORE = {}  # אחסון טוקנים
+
+async def handle_inline_query(update, context):
+    query = update.inline_query.query or ""
+    offset = int(update.inline_query.offset or 0)
+    user_id = update.inline_query.from_user.id
+
+    # סינון תוצאות
+    all_items = get_available_commands()  # רשימת הפריטים
+    if query:
+        all_items = [c for c in all_items if query.lower() in c.lower()]
+
+    # חיתוך לעמוד הנוכחי
+    page = all_items[offset:offset + PAGE_SIZE]
+    qhash = hashlib.sha1(query.encode()).hexdigest()[:12]
+
+    results = []
+    for item in page:
+        # יצירת טוקן ייחודי לכל תוצאה
+        token = secrets.token_urlsafe(8)
+        EXEC_STORE[token] = {
+            "type": "command",
+            "item": item,
+            "user_id": user_id,
+            "ts": time.time()
+        }
+
+        results.append(InlineQueryResultArticle(
+            id=f"run:{token}:{offset}",
+            title=f"הרץ: {item}",
+            input_message_content=InputTextMessageContent(f"/sh {item}")
+        ))
+
+    # חישוב offset הבא
+    next_offset = str(offset + PAGE_SIZE) if offset + PAGE_SIZE &lt; len(all_items) else ""
+
+    await update.inline_query.answer(
+        results,
+        cache_time=0,
+        is_personal=True,
+        next_offset=next_offset
+    )</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-6">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.6 הרצת Java עם זיהוי שם מחלקה</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מזהה אוטומטית את שם ה-public class בקוד Java ויוצר קובץ עם השם הנכון. מאפשר הרצת קוד Java שרירותי.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import os
+import re
+import shutil
+import tempfile
+import subprocess
+
+def run_java_blocking(src: str, cwd: str, env: dict, timeout: int):
+    """מריץ קוד Java עם זיהוי אוטומטי של שם המחלקה."""
+    tmp_dir = None
+    try:
+        tmp_dir = tempfile.mkdtemp()
+
+        # זיהוי שם המחלקה הציבורית
+        class_name = "Main"
+        match = re.search(
+            r'public\s+(?:final\s+|abstract\s+|static\s+)*class\s+(\w+)',
+            src
+        )
+        if match:
+            class_name = match.group(1)
+
+        # כתיבת קובץ עם השם הנכון
+        java_file = os.path.join(tmp_dir, f"{class_name}.java")
+        with open(java_file, "w", encoding="utf-8") as f:
+            f.write(src)
+
+        # קומפילציה
+        compile_result = subprocess.run(
+            ["javac", java_file],
+            capture_output=True, text=True,
+            timeout=timeout, cwd=tmp_dir, env=env
+        )
+
+        if compile_result.returncode != 0:
+            return compile_result  # שגיאת קומפילציה
+
+        # הרצה
+        return subprocess.run(
+            ["java", class_name],
+            capture_output=True, text=True,
+            timeout=timeout, cwd=tmp_dir, env=env
+        )
+    finally:
+        if tmp_dir and os.path.exists(tmp_dir):
+            shutil.rmtree(tmp_dir)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-7">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.7 מטפל בפקודות Shell מובנות (cd, export, unset)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מאפשר שמירת מצב סשן (ספריה נוכחית, משתני סביבה) בין פקודות. תומך ב-cd -, export ו-unset.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import os
+import shlex
+
+def handle_builtins(session: dict, cmdline: str) -&gt; str | None:
+    """מטפל בפקודות מובנות של shell. מחזיר תשובה או None אם לא מובנית."""
+    # לא מטפל בפקודות מורכבות
+    if any(x in cmdline for x in (";", "&amp;&amp;", "||", "|", "\n")):
+        return None
+
+    try:
+        parts = shlex.split(cmdline, posix=True)
+    except ValueError:
+        return "❗ שגיאת פרסינג"
+
+    if not parts:
+        return "❗ אין פקודה"
+
+    cmd = parts[0]
+
+    if cmd == "cd":
+        target = parts[1] if len(parts) &gt; 1 else os.path.expanduser("~")
+
+        # תמיכה ב-cd -
+        if target == "-":
+            target = session.get("prev_cwd", session.get("cwd", os.getcwd()))
+
+        new_path = os.path.abspath(
+            os.path.join(session.get("cwd", os.getcwd()),
+                        os.path.expanduser(target))
+        )
+
+        if os.path.isdir(new_path):
+            session["prev_cwd"] = session.get("cwd")
+            session["cwd"] = new_path
+            return f"📁 cwd: {new_path}"
+        return f"❌ לא נמצא: {target}"
+
+    if cmd == "export":
+        env = session.setdefault("env", {})
+        if len(parts) == 1:
+            return "\n".join(f"{k}={v}" for k, v in sorted(env.items()))
+
+        results = []
+        for tok in parts[1:]:
+            if "=" in tok:
+                k, v = tok.split("=", 1)
+                env[k] = v
+                results.append(f"set {k}={v}")
+            else:
+                results.append(f"{tok}={env.get(tok, '')}")
+        return "\n".join(results)
+
+    if cmd == "unset":
+        env = session.setdefault("env", {})
+        for var in parts[1:]:
+            env.pop(var, None)
+        return f"unset: {', '.join(parts[1:])}"
+
+    return None  # לא פקודה מובנית</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-8">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.8 יצירת PTY Session עם ניקוי בטוח</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> יוצר טרמינל אינטראקטיבי אמיתי (PTY) עם ניקוי מסודר של משאבים בכל מצב כשלון.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import os
+import pty
+import fcntl
+import signal
+import termios
+import uuid
+
+pty_sessions = {}
+
+def create_pty_session(user_id: int, shell: str = "/bin/bash") -&gt; dict:
+    """יוצר PTY session חדש עם ניקוי בטוח."""
+    master_fd = slave_fd = child_pid = None
+
+    try:
+        master_fd, slave_fd = pty.openpty()
+        pid = os.fork()
+
+        if pid == 0:  # תהליך בן
+            try:
+                os.close(master_fd)
+                os.setsid()
+                fcntl.ioctl(slave_fd, termios.TIOCSCTTY, 0)
+                os.dup2(slave_fd, 0)
+                os.dup2(slave_fd, 1)
+                os.dup2(slave_fd, 2)
+                if slave_fd &gt; 2:
+                    os.close(slave_fd)
+
+                env = os.environ.copy()
+                env["TERM"] = "xterm-256color"
+                os.execvpe(shell, [shell], env)
+            except Exception:
+                os._exit(1)
+
+        else:  # תהליך אב
+            child_pid = pid
+            os.close(slave_fd)
+            slave_fd = None
+
+            session = {
+                "session_id": str(uuid.uuid4()),
+                "user_id": user_id,
+                "master_fd": master_fd,
+                "pid": pid,
+            }
+            pty_sessions[user_id] = session
+            return session
+
+    except Exception:
+        # ניקוי במקרה כשלון
+        if master_fd:
+            os.close(master_fd)
+        if slave_fd:
+            os.close(slave_fd)
+        if child_pid:
+            os.kill(child_pid, signal.SIGKILL)
+            os.waitpid(child_pid, os.WNOHANG)
+        raise
+
+def close_pty_session(session: dict):
+    """סוגר PTY session בבטחה."""
+    try:
+        os.close(session["master_fd"])
+    except:
+        pass
+    try:
+        os.kill(session["pid"], signal.SIGTERM)
+        import time
+        time.sleep(0.1)
+        os.kill(session["pid"], signal.SIGKILL)
+    except:
+        pass
+    try:
+        os.waitpid(session["pid"], os.WNOHANG)
+    except:
+        pass</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-9">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.9 דיווח פעילות ברקע ללא חסימה</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> שולח דיווח פעילות למסד נתונים מבלי לחסום את הטיפול בהודעה. משתמש ב-asyncio.create_task או thread כ-fallback.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import asyncio
+import threading
+
+def report_nowait(reporter, user_id: int) -&gt; None:
+    """דיווח פעילות ברקע ללא עיכוב."""
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(
+            asyncio.to_thread(reporter.report_activity, user_id)
+        )
+    except RuntimeError:
+        # אין event loop פעיל - שימוש ב-thread
+        threading.Thread(
+            target=reporter.report_activity,
+            args=(user_id,),
+            daemon=True
+        ).start()</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-10">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.10 נרמול קוד מקלט משתמש</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מנקה תווים מוסתרים, גרשיים חכמים, ו-code fences שמגיעים מהעתקה מאפליקציות שונות. מונע שגיאות פרסינג.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import re
+import unicodedata
+
+def normalize_code(text: str) -&gt; str:
+    """מנקה קוד מתווים בעייתיים."""
+    if not text:
+        return ""
+
+    # נרמול Unicode
+    text = unicodedata.normalize("NFKC", text)
+
+    # גרשיים חכמים → רגילים
+    text = text.replace(""", '"').replace(""", '"').replace("„", '"')
+    text = text.replace("'", "'").replace("'", "'")
+
+    # רווחים מיוחדים
+    text = text.replace("\u00A0", " ")  # NBSP
+    text = text.replace("\u202F", " ")  # Narrow NBSP
+
+    # סימני כיוון
+    text = text.replace("\u200E", "")  # LTR mark
+    text = text.replace("\u200F", "")  # RTL mark
+
+    # מקף רך
+    text = text.replace("\u00AD", "")
+
+    # שורות חדשות
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    # הסרת code fences
+    text = re.sub(r"(?m)^\s*</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-11">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.11 ארכיטקטורת Multi-Thread (בוט + שרת)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מריץ שרת Web ובוט טלגרם במקביל. הבוט חייב להיות ב-main thread בשביל signal handlers.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import os
+import sys
+import time
+import threading
+
+def run_webapp_in_thread():
+    """מריץ Flask ב-thread רקע."""
+    import webapp_server
+    host = os.getenv("WEBAPP_HOST", "0.0.0.0")
+    port = int(os.getenv("WEBAPP_PORT", "8080"))
+    webapp_server.app.run(
+        host=host, port=port,
+        debug=False, threaded=True, use_reloader=False
+    )
+
+def run_bot_in_main():
+    """מריץ את הבוט ב-main thread (חובה ל-signal handlers)."""
+    import bot
+    bot.main()
+
+def main():
+    # שרת Web ב-daemon thread
+    web_thread = threading.Thread(
+        target=run_webapp_in_thread,
+        daemon=True,
+        name="webapp"
+    )
+    web_thread.start()
+
+    # המתנה קצרה לאתחול
+    time.sleep(1)
+
+    if web_thread.is_alive():
+        print(f"✅ Web App: http://0.0.0.0:{os.getenv('WEBAPP_PORT', '8080')}")
+
+    # בוט ב-main thread
+    try:
+        run_bot_in_main()
+    except KeyboardInterrupt:
+        print("\n⏹️ Shutting down...")
+        sys.exit(0)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-12">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.12 אימות נתוני WebApp מטלגרם</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מאמת שה-init_data הגיע באמת מטלגרם (HMAC). חובה לכל Web App שרוצה לדעת מי המשתמש.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import hmac
+import json
+import time
+import hashlib
+from urllib.parse import parse_qsl, unquote
+
+def validate_telegram_webapp_data(init_data: str, bot_token: str) -&gt; dict | None:
+    """מאמת נתוני WebApp מטלגרם. מחזיר dict או None אם לא תקין."""
+    try:
+        parsed = dict(parse_qsl(init_data, keep_blank_values=True))
+        if "hash" not in parsed:
+            return None
+
+        received_hash = parsed.pop("hash")
+
+        # יצירת data-check-string
+        data_check_string = "\n".join(
+            f"{k}={parsed[k]}" for k in sorted(parsed.keys())
+        )
+
+        # חישוב hash
+        secret_key = hmac.new(
+            b"WebAppData",
+            bot_token.encode(),
+            hashlib.sha256
+        ).digest()
+
+        calculated_hash = hmac.new(
+            secret_key,
+            data_check_string.encode(),
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(calculated_hash, received_hash):
+            return None
+
+        # בדיקת תוקף (24 שעות)
+        auth_date = int(parsed.get("auth_date", 0))
+        if time.time() - auth_date &gt; 86400:
+            return None
+
+        # פענוח user
+        user_data = parsed.get("user", "{}")
+        parsed["user"] = json.loads(unquote(user_data))
+
+        return parsed
+    except Exception:
+        return None</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-13">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.13 עריכת הודעת Inline עם Fallback להודעה פרטית</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מנסה לערוך הודעה שנשלחה מ-inline query. אם נכשל (אין הרשאה), שולח את התוצאה בפרטי.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import secrets
+
+PREVIEW_MAX = 800
+EXEC_STORE = {}
+
+async def update_inline_result(bot, inline_msg_id, user_id, result, run_type, query):
+    """מעדכן תוצאת inline או שולח בפרטי אם נכשל."""
+
+    # קיצור לתצוגה
+    display = result if len(result) &lt;= PREVIEW_MAX else (
+        result[:PREVIEW_MAX] + "\n\n…(שאר נשלח בפרטי)"
+    )
+
+    # יצירת טוקן לרענון
+    token = secrets.token_urlsafe(8)
+    EXEC_STORE[token] = {
+        "type": run_type,
+        "q": query,
+        "user_id": user_id
+    }
+
+    markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 רענון", callback_data=f"refresh:{token}")]
+    ])
+
+    if inline_msg_id:
+        try:
+            await bot.edit_message_text(
+                inline_message_id=inline_msg_id,
+                text=display,
+                reply_markup=markup
+            )
+            return True
+        except Exception:
+            pass  # נכשל - ננסה fallback
+
+    # Fallback: הודעה פרטית
+    try:
+        await bot.send_message(
+            chat_id=user_id,
+            text=result,  # שולחים את המלא
+            reply_markup=markup
+        )
+        return True
+    except Exception:
+        return False</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-14">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.14 ניהול רשימת פקודות מותרות עם Persistence</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> שומר רשימת פקודות מאושרות לקובץ. תומך בטעינה מ-ENV, קובץ, או ברירת מחדל.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import os
+
+ALLOWED_CMDS_FILE = "allowed_cmds.txt"
+DEFAULT_CMDS = {"ls", "pwd", "cat", "echo", "python", "pip", "git"}
+
+def parse_cmds_string(value: str) -&gt; set:
+    """מפרסר רשימת פקודות מופרדות בפסיק/שורה."""
+    if not value:
+        return set()
+    tokens = []
+    for part in value.replace("\r", "").replace("\n", ",").split(","):
+        tok = part.strip()
+        if tok:
+            tokens.append(tok)
+    return set(tokens)
+
+def load_allowed_cmds() -&gt; set:
+    """טוען פקודות מותרות לפי סדר עדיפות: ENV &gt; קובץ &gt; ברירת מחדל."""
+    # קודם ENV
+    env_cmds = os.getenv("ALLOWED_CMDS", "")
+    if env_cmds:
+        return parse_cmds_string(env_cmds)
+
+    # אחר כך קובץ
+    try:
+        if os.path.exists(ALLOWED_CMDS_FILE):
+            with open(ALLOWED_CMDS_FILE, "r") as f:
+                parsed = parse_cmds_string(f.read())
+                if parsed:
+                    return parsed
+    except Exception:
+        pass
+
+    return set(DEFAULT_CMDS)
+
+def save_allowed_cmds(cmds: set) -&gt; None:
+    """שומר פקודות מותרות לקובץ."""
+    try:
+        with open(ALLOWED_CMDS_FILE, "w") as f:
+            f.write("\n".join(sorted(cmds)))
+    except Exception:
+        pass
+
+# שימוש בפקודות /allow, /deny:
+async def allow_cmd(update, context):
+    args = update.message.text.partition(" ")[2]
+    to_add = parse_cmds_string(args)
+    if not to_add:
+        return await update.message.reply_text("שימוש: /allow cmd1,cmd2")
+
+    ALLOWED_CMDS.update(to_add)
+    save_allowed_cmds(ALLOWED_CMDS)
+    await update.message.reply_text(f"נוספו: {', '.join(sorted(to_add))}")</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-15">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.15 דקורטור אימות Flask עם Dev Mode</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מאמת משתמשים ב-production, מדלג על אימות ב-dev mode. קל לפיתוח מקומי ובטוח בפרודקשן.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import os
+from functools import wraps
+from flask import request, jsonify
+
+DEV_MODE = os.getenv("WEBAPP_DEV_MODE", "").lower() in ("1", "true")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+OWNER_IDS = {123456789}  # IDs מורשים
+
+def require_auth(f):
+    """דקורטור אימות עם תמיכה ב-dev mode."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # Dev mode - דילוג על אימות
+        if DEV_MODE:
+            request.user_id = 0
+            request.user_data = {"dev_mode": True}
+            return f(*args, **kwargs)
+
+        # Production - נדרש BOT_TOKEN
+        if not BOT_TOKEN:
+            return jsonify({
+                "error": "Server misconfigured",
+                "message": "BOT_TOKEN not set"
+            }), 503
+
+        init_data = request.headers.get("X-Telegram-Init-Data", "")
+        data = validate_telegram_webapp_data(init_data, BOT_TOKEN)
+
+        if not data:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        user = data.get("user", {})
+        user_id = user.get("id", 0)
+
+        if user_id not in OWNER_IDS:
+            return jsonify({"error": "Forbidden"}), 403
+
+        request.user_id = user_id
+        request.user_data = user
+        return f(*args, **kwargs)
+
+    return decorated
+
+# שימוש:
+@app.route("/api/execute", methods=["POST"])
+@require_auth
+def execute():
+    user_id = request.user_id
+    # ... לוגיקה</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-16">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.16 דיווח פעילות פשוט למסד נתונים</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מדווח על פעילות משתמש למסד נתונים (MongoDB) בצורה שקטה - לא מפיל את הבוט גם אם יש שגיאה.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from pymongo import MongoClient
+from datetime import datetime, timezone
+
+class SimpleActivityReporter:
+    def __init__(self, mongodb_uri: str, service_id: str, service_name: str = None):
+        try:
+            self.client = MongoClient(mongodb_uri)
+            self.db = self.client["bot_monitor"]
+            self.service_id = service_id
+            self.service_name = service_name or service_id
+            self.connected = True
+        except:
+            self.connected = False
+
+    def report_activity(self, user_id: int):
+        """דיווח פעילות - שקט בכישלון."""
+        if not self.connected:
+            return
+
+        try:
+            now = datetime.now(timezone.utc)
+
+            # עדכון אינטראקציית משתמש
+            self.db.user_interactions.update_one(
+                {"service_id": self.service_id, "user_id": user_id},
+                {
+                    "$set": {"last_interaction": now},
+                    "$inc": {"interaction_count": 1},
+                    "$setOnInsert": {"created_at": now}
+                },
+                upsert=True
+            )
+
+            # עדכון פעילות שירות
+            self.db.service_activity.update_one(
+                {"_id": self.service_id},
+                {
+                    "$set": {
+                        "last_user_activity": now,
+                        "service_name": self.service_name
+                    },
+                    "$setOnInsert": {"created_at": now}
+                },
+                upsert=True
+            )
+        except:
+            pass  # שקט - לא להפיל את הבוט
+
+# שימוש:
+reporter = SimpleActivityReporter(
+    mongodb_uri="mongodb://...",
+    service_id="my-bot",
+    service_name="MyTelegramBot"
+)
+reporter.report_activity(user_id=123456)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-17">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.17 חלוקת טקסט לפי שורות עם מגבלת גודל</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מחלק הודעות ארוכות לחתיכות תוך שמירה על שורות שלמות (לא חותך באמצע שורה). מתאים להודעות טלגרם.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">TG_MAX_MESSAGE = 4000
+
+def split_by_lines(text: str, max_len: int = TG_MAX_MESSAGE) -&gt; list[str]:
+    """מפצל טקסט לחתיכות תוך שמירה על שורות שלמות."""
+    text = text or ""
+    hard_cap = min(max_len, TG_MAX_MESSAGE - 100)
+
+    if len(text) &lt;= hard_cap:
+        return [text]
+
+    lines = text.splitlines()
+    chunks = []
+    current = []
+    current_len = 0
+
+    for line in lines:
+        line_len = len(line) + (1 if current else 0)  # +1 לשורה חדשה
+
+        if current_len + line_len &gt; hard_cap and current:
+            # שומרים את החתיכה הנוכחית ומתחילים חדשה
+            chunks.append("\n".join(current))
+            current = [line]
+            current_len = len(line)
+        else:
+            current.append(line)
+            current_len += line_len
+
+    # שארית
+    if current:
+        chunks.append("\n".join(current))
+
+    return chunks if chunks else [""]
+
+# שימוש:
+async def send_long_message(update, text):
+    for chunk in split_by_lines(text):
+        await update.message.reply_text(chunk)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-18">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.18 שינוי גודל חלון PTY דרך WebSocket</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מאפשר לטרמינל להתאים לגודל החלון של המשתמש. חשוב ל-TUI applications כמו vim, htop.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import struct
+import fcntl
+import termios
+
+def resize_pty(master_fd: int, rows: int, cols: int):
+    """משנה גודל חלון PTY."""
+    try:
+        winsize = struct.pack("HHHH", rows, cols, 0, 0)
+        fcntl.ioctl(master_fd, termios.TIOCSWINSZ, winsize)
+    except Exception:
+        pass
+
+# שימוש ב-WebSocket handler:
+@sock.route("/ws/terminal")
+def ws_terminal(ws):
+    session = create_pty_session(user_id)
+
+    while True:
+        msg = ws.receive()
+        if not msg:
+            break
+
+        data = json.loads(msg)
+
+        if data.get("type") == "resize":
+            resize_pty(
+                session["master_fd"],
+                rows=data.get("rows", 24),
+                cols=data.get("cols", 80)
+            )
+        elif data.get("type") == "input":
+            os.write(session["master_fd"], data["data"].encode())</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-19">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.19 כפתור WebApp עם קישור דינמי</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> יוצר כפתור שפותח את ה-WebApp רק אם הוא מוגדר. מציג הוראות אם לא.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import os
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+
+async def webapp_cmd(update, context):
+    """פותח את ה-WebApp או מציג הוראות הגדרה."""
+    webapp_url = os.getenv("WEBAPP_URL", "")
+
+    if not webapp_url:
+        return await update.message.reply_text(
+            "❗ Web App לא מוגדר.\n\n"
+            "כדי להפעיל:\n"
+            "1. הרץ את webapp_server.py\n"
+            "2. קבע WEBAPP_URL (למשל: https://your-domain.com)\n"
+            "3. הגדר את ה-WebApp ב-@BotFather"
+        )
+
+    await update.message.reply_text(
+        "🖥️ לחץ על הכפתור לפתיחת הטרמינל:",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton(
+                "פתח Web App 🚀",
+                web_app=WebAppInfo(url=webapp_url)
+            )]
+        ])
+    )</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-56-20">
+          <div class="snippet-header">
+            <h3 class="snippet-title">56.20 אימות WebSocket עם Telegram Init Data</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מאמת משתמש ב-WebSocket connection לפני מתן גישה לטרמינל. שומר על אבטחה גם בחיבורי WS.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import json
+
+def validate_ws_auth(ws, bot_token: str, owner_ids: set) -&gt; int | None:
+    """מאמת WebSocket connection. מחזיר user_id או None."""
+    try:
+        # ממתין להודעת auth (ראשונה)
+        auth_msg = ws.receive(timeout=5)
+        if not auth_msg:
+            return None
+
+        auth_data = json.loads(auth_msg)
+        if auth_data.get("type") != "auth":
+            return None
+
+        init_data = auth_data.get("init_data", "")
+        data = validate_telegram_webapp_data(init_data, bot_token)
+
+        if not data:
+            return None
+
+        user = data.get("user", {})
+        user_id = user.get("id", 0)
+
+        if user_id not in owner_ids:
+            return None
+
+        return user_id
+    except Exception:
+        return None
+
+# שימוש:
+@sock.route("/ws/terminal")
+def ws_terminal(ws):
+    user_id = validate_ws_auth(ws, BOT_TOKEN, OWNER_IDS)
+
+    if user_id is None:
+        ws.send(json.dumps({
+            "type": "error",
+            "message": "Authentication failed"
+        }))
+        return
+
+    # ... המשך הלוגיקה</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 57: בוט טלגרם ווואטסאפ -->
+      <div class="category" id="category-57">
+        <div class="category-header">
+          <i class="fas fa-comments"></i>
+          <h2>בוט טלגרם ווואטסאפ</h2>
+        </div>
+
+        <div class="snippet" id="snippet-57-1">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.1 Placeholder לטלפון בטלגרם</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> טלגרם לא מספק מספר טלפון בהכרח, אבל DB דורש phone_number. יוצר מזהה יציב שלא יפוצץ את הDB.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import hashlib
+
+def _telegram_phone_placeholder(telegram_chat_id: str) -&gt; str:
+    """
+    יצירת placeholder קצר ל-phone_number עבור משתמשי Telegram.
+    מונע כשלי DB כש-phone_number מוגדר NOT NULL.
+    """
+    if telegram_chat_id is None or str(telegram_chat_id).strip() in ("", "None"):
+        raise ValueError("telegram_chat_id is required")
+
+    telegram_chat_id = str(telegram_chat_id).strip()
+    candidate = f"tg:{telegram_chat_id}"
+
+    # אם המזהה קצר מספיק - משתמשים בו ישירות
+    if len(candidate) &lt;= 20:
+        return candidate
+
+    # אחרת - יוצרים hash קצר
+    digest = hashlib.sha1(telegram_chat_id.encode("utf-8")).hexdigest()[:17]
+    return f"tg:{digest}"</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-2">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.2 חילוץ Chat ID מסוגי עדכונים שונים</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> טלגרם שולח עדכונים בפורמטים שונים (הודעות, callback queries). פונקציה אחת שתמיד מחזירה chat_id נכון.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">def _resolve_telegram_chat_id(update: "TelegramUpdate") -&gt; str | None:
+    """
+    חילוץ chat_id יציב גם עבור callback_query ללא message.
+    ב-private chat, user_id == chat_id ולכן אפשר ליפול ל-from_user.id.
+    """
+    # עדכון רגיל עם הודעה
+    if update.message:
+        return str(update.message.chat.id)
+
+    # כפתור inline נלחץ
+    if update.callback_query:
+        cb = update.callback_query
+        # קודם מנסים לקבל מההודעה שעליה לחצו
+        if cb.message:
+            return str(cb.message.chat.id)
+        # fallback ל-user ID (שווה ל-chat ID ב-private)
+        if cb.from_user:
+            return str(cb.from_user.id)
+
+    return None</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-3">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.3 Pydantic עם Field Alias למילים שמורות</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> ה-JSON של טלגרם מכיל שדה `from` שזו מילה שמורה בפייתון. Field alias פותר את זה בצורה אלגנטית.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional
+
+class TelegramUser(BaseModel):
+    id: int
+    first_name: str
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+
+
+class TelegramMessage(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    message_id: int
+    # 'from' היא מילה שמורה - משתמשים ב-alias
+    from_user: Optional[TelegramUser] = Field(default=None, alias="from")
+    text: Optional[str] = None
+    date: int
+
+
+class TelegramCallbackQuery(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    from_user: Optional[TelegramUser] = Field(default=None, alias="from")
+    data: Optional[str] = None</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-4">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.4 המרת HTML לפורמט וואטסאפ</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> כותבים הודעות ב-HTML אחיד, והפונקציה ממירה אוטומטית לפורמט של וואטסאפ (כוכביות, קווים תחתונים).</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import re
+import html
+
+def convert_html_to_whatsapp(text: str) -&gt; str:
+    """
+    ממיר תגי HTML לפורמט וואטסאפ.
+    &lt;b&gt; → *, &lt;i&gt; → _, &lt;code&gt; → `
+    """
+    if not text:
+        return ""
+
+    # המרת תגי bold
+    result = re.sub(r"&lt;b&gt;(.*?)&lt;/b&gt;", r"*\1*", text, flags=re.DOTALL)
+    result = re.sub(r"&lt;strong&gt;(.*?)&lt;/strong&gt;", r"*\1*", result, flags=re.DOTALL)
+
+    # המרת תגי italic
+    result = re.sub(r"&lt;i&gt;(.*?)&lt;/i&gt;", r"_\1_", result, flags=re.DOTALL)
+    result = re.sub(r"&lt;em&gt;(.*?)&lt;/em&gt;", r"_\1_", result, flags=re.DOTALL)
+
+    # המרת תגי strikethrough
+    result = re.sub(r"&lt;s&gt;(.*?)&lt;/s&gt;", r"~\1~", result, flags=re.DOTALL)
+    result = re.sub(r"&lt;del&gt;(.*?)&lt;/del&gt;", r"~\1~", result, flags=re.DOTALL)
+
+    # המרת תגי code
+    result = re.sub(r"&lt;code&gt;(.*?)&lt;/code&gt;", r"`\1`", result, flags=re.DOTALL)
+    result = re.sub(r"&lt;pre&gt;(.*?)&lt;/pre&gt;", r"</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-5">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.5 פקודות אדמין עם Regex בעברית</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> זיהוי פקודות בעברית מקבוצת מנהלים, עם תמיכה באימוג'י ובפורמטים גמישים ("אשר 123", "✅ אשר שליח 123").</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import re
+from typing import Optional
+
+async def handle_admin_group_command(db, text: str) -&gt; Optional[str]:
+    """
+    טיפול בפקודות מנהל מקבוצת הוואטסאפ.
+    מזהה פקודות כמו "אשר שליח 123" או "דחה שליח 456"
+    """
+    text = text.strip()
+
+    # זיהוי פקודת אישור - תומך בפורמטים:
+    # "אשר 123", "אשר שליח 123", "✅ אשר 123"
+    # ^ מוודא שמתחיל בתחילת ההודעה - מונע התאמה של ציטוטים
+    approve_match = re.match(r'^[✅\s]*אשר(?:\s+שליח)?\s+(\d+)\s*$', text)
+    if approve_match:
+        user_id = int(approve_match.group(1))
+        return await _approve_courier(db, user_id)
+
+    # זיהוי פקודת דחייה
+    reject_match = re.match(r'^[❌\s]*דחה(?:\s+שליח)?\s+(\d+)\s*$', text)
+    if reject_match:
+        user_id = int(reject_match.group(1))
+        return await _reject_courier(db, user_id)
+
+    return None  # לא זוהתה פקודה</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-6">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.6 Token מאובטח לקישורי Smart Link</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> במקום לחשוף ID של משלוח בקישור (ניתן לנחש), יוצרים token אקראי שלא ניתן לניחוש.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import secrets
+from sqlalchemy import Column, String
+
+def generate_secure_token():
+    """יצירת token מאובטח URL-safe לקישורי משלוח"""
+    return secrets.token_urlsafe(16)
+
+
+class Delivery(Base):
+    __tablename__ = "deliveries"
+
+    id = Column(Integer, primary_key=True)
+    # Token מאובטח לקישורים - מונע ניחוש של IDs
+    token = Column(
+        String(32),
+        unique=True,
+        nullable=False,
+        default=generate_secure_token,
+        index=True
+    )
+
+
+# שימוש - תפיסת משלוח לפי token במקום ID
+async def capture_delivery_by_token(token: str, courier_id: int):
+    """תפיסת משלוח לפי token מאובטח (לא לפי ID)"""
+    result = await db.execute(
+        select(Delivery).where(Delivery.token == token)
+    )
+    delivery = result.scalar_one_or_none()
+
+    if not delivery:
+        return False, "המשלוח לא נמצא (קישור לא תקין)", None
+
+    # המשך לתפיסה לפי ID הפנימי
+    return await capture_delivery(delivery.id, courier_id)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-7">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.7 תפיסה אטומית עם נעילת שורות (Row Locks)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> מניעת race conditions - שני שליחים לא יכולים לתפוס אותו משלוח. גם מוודא שיש מספיק קרדיט לפני התפיסה.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from sqlalchemy import select
+
+async def capture_delivery(delivery_id: int, courier_id: int):
+    """
+    תפיסה אטומית: נעילה → בדיקה → עדכון → commit
+    הכל בטרנזקציה אחת.
+    """
+    try:
+        # 1. נעילת רשומת המשלוח (FOR UPDATE)
+        delivery_result = await db.execute(
+            select(Delivery)
+            .where(Delivery.id == delivery_id)
+            .with_for_update()  # &lt;- נעילה ברמת שורה
+        )
+        delivery = delivery_result.scalar_one_or_none()
+
+        if not delivery:
+            return False, "המשלוח לא נמצא", None
+
+        # 2. בדיקת סטטוס (אחרי הנעילה!)
+        if delivery.status != DeliveryStatus.OPEN:
+            return False, "המשלוח כבר נתפס על ידי שליח אחר", None
+
+        # 3. נעילת ארנק השליח
+        wallet_result = await db.execute(
+            select(CourierWallet)
+            .where(CourierWallet.courier_id == courier_id)
+            .with_for_update()
+        )
+        wallet = wallet_result.scalar_one_or_none()
+
+        # 4. בדיקת קרדיט
+        fee = delivery.fee
+        future_balance = wallet.balance - fee
+
+        if future_balance &lt; wallet.credit_limit:
+            return False, f"יתרה לא מספיקה", None
+
+        # 5. עדכון כל הנתונים
+        delivery.status = DeliveryStatus.CAPTURED
+        delivery.courier_id = courier_id
+        wallet.balance = future_balance
+
+        # 6. רישום בledger
+        ledger_entry = WalletLedger(
+            courier_id=courier_id,
+            delivery_id=delivery_id,
+            entry_type=LedgerEntryType.DELIVERY_FEE_DEBIT,
+            amount=-fee,
+            balance_after=future_balance
+        )
+        db.add(ledger_entry)
+
+        # 7. commit אטומי - הכל או כלום
+        await db.commit()
+
+        return True, f"המשלוח נתפס! יתרה: {future_balance}₪", delivery
+
+    except Exception as e:
+        await db.rollback()
+        raise CaptureError(f"שגיאה בתפיסת המשלוח: {str(e)}")</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-8">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.8 Backoff עם הגנת Overflow</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> חישוב backoff אקספוננציאלי בלי לפוצץ את הזיכרון כשretry_count גדול מדי.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">def _calculate_backoff_seconds(
+    retry_count: int,
+    *,
+    base_seconds: int = 60,
+    max_backoff_seconds: int = 3600,
+) -&gt; int:
+    """
+    חישוב backoff אקספוננציאלי עם הגנת overflow.
+    formula: base * (2 ** retry_count), מוגבל ל-max
+    """
+    if retry_count &lt; 0:
+        retry_count = 0
+
+    if base_seconds &lt;= 0 or max_backoff_seconds &lt;= 0:
+        return 0
+
+    # כבר במקסימום?
+    if base_seconds &gt;= max_backoff_seconds:
+        return max_backoff_seconds
+
+    # חישוב הסף שבו נגיע למקסימום - בלי לחשב 2**retry_count
+    required_multiplier = (max_backoff_seconds + base_seconds - 1) // base_seconds
+    is_power_of_two = (required_multiplier &amp; (required_multiplier - 1)) == 0
+    threshold = required_multiplier.bit_length() - 1
+    if not is_power_of_two:
+        threshold += 1
+
+    # אם עברנו את הסף - מחזירים מקסימום ישירות
+    if retry_count &gt;= threshold:
+        return max_backoff_seconds
+
+    # חישוב רגיל (בטוח - לא יגרום ל-overflow)
+    backoff = base_seconds * (1 &lt;&lt; retry_count)  # 1 &lt;&lt; n == 2**n
+    return min(backoff, max_backoff_seconds)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-9">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.9 ניהול Event Loop ב-Celery Tasks</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> Celery רץ sync אבל הקוד שלך async. ה-context manager מוודא ניקוי תקין של resources.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import asyncio
+from contextlib import contextmanager
+
+@contextmanager
+def get_event_loop():
+    """
+    Context manager ליצירת event loop נקי ב-Celery.
+    מוודא ביטול tasks תלויים וסגירה נקייה.
+    """
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        yield loop
+    finally:
+        try:
+            # ביטול כל ה-tasks שעדיין רצים
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            # המתנה לביטול
+            if pending:
+                loop.run_until_complete(
+                    asyncio.gather(*pending, return_exceptions=True)
+                )
+        finally:
+            loop.run_until_complete(loop.shutdown_asyncgens())
+            loop.close()
+
+
+def run_async(coro):
+    """הרצת קוד async ב-Celery task"""
+    with get_event_loop() as loop:
+        return loop.run_until_complete(coro)
+
+
+# שימוש ב-Celery task
+@celery_app.task
+def process_outbox_messages():
+    async def _process():
+        async with get_task_session() as db:
+            # קוד async כאן...
+            pass
+
+    return run_async(_process())</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-10">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.10 עדכון JSON Field ב-SQLAlchemy</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> SQLAlchemy לא מזהה שינויים בתוך JSON field. חייבים ליצור dict חדש כדי לגרום ל-dirty flag.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">async def update_context(user_id: int, platform: str, key: str, value: any):
+    """עדכון שדה בתוך JSON column ב-SQLAlchemy"""
+    session = await get_or_create_session(user_id, platform)
+
+    # יצירת copy של ה-dict - חובה!
+    # שינוי in-place לא יזוהה על ידי SQLAlchemy
+    context = dict(session.context_data or {})  # &lt;- חייבים copy
+    context[key] = value
+    session.context_data = context  # השמה חדשה מפעילה dirty flag
+
+    await db.commit()
+
+
+async def transition_to(user_id: int, platform: str, new_state: str, context_update: dict = None):
+    """מעבר state עם עדכון context"""
+    session = await get_or_create_session(user_id, platform)
+    session.current_state = new_state
+
+    if context_update:
+        # יצירת dict חדש - לא לשנות in-place!
+        current_context = dict(session.context_data or {})
+        current_context.update(context_update)
+        session.context_data = current_context
+
+    await db.commit()</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-11">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.11 Double-Checked Locking ל-Singleton</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> Circuit breaker צריך להיות singleton, אבל חייבים תמיכה ב-thread safety (Celery workers).</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import threading
+
+class CircuitBreaker:
+    """Circuit breaker עם singleton pattern thread-safe"""
+
+    _instances: dict[str, "CircuitBreaker"] = {}
+    _instances_lock = threading.Lock()
+
+    @classmethod
+    def get_instance(cls, service_name: str, config=None) -&gt; "CircuitBreaker":
+        """Double-checked locking - מהיר ובטוח"""
+
+        # בדיקה ראשונה - ללא נעילה (fast path)
+        if service_name not in cls._instances:
+            # נעילה רק אם צריך ליצור
+            with cls._instances_lock:
+                # בדיקה שנייה - בתוך הנעילה
+                # (אולי thread אחר יצר בינתיים)
+                if service_name not in cls._instances:
+                    cls._instances[service_name] = cls(service_name, config)
+
+        return cls._instances[service_name]
+
+
+# שימוש - תמיד מקבלים את אותו instance
+cb1 = CircuitBreaker.get_instance("telegram")
+cb2 = CircuitBreaker.get_instance("telegram")
+assert cb1 is cb2  # True</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-12">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.12 מעברי State Machine מותרים</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> הגדרת מעברים חוקיים מונעת באגים - אי אפשר לדלג על שלבים בזרימה.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from enum import Enum
+
+class CourierState(str, Enum):
+    INITIAL = "COURIER.INITIAL"
+    AWAITING_NAME = "COURIER.AWAITING_NAME"
+    AWAITING_AREA = "COURIER.AWAITING_AREA"
+    AWAITING_DOCUMENT = "COURIER.AWAITING_DOCUMENT"
+    PENDING_APPROVAL = "COURIER.PENDING_APPROVAL"
+    MENU = "COURIER.MENU"
+
+
+# הגדרת מעברים מותרים - מכל state לאן אפשר להגיע
+COURIER_TRANSITIONS = {
+    CourierState.INITIAL: {CourierState.AWAITING_NAME},
+    CourierState.AWAITING_NAME: {CourierState.AWAITING_AREA, CourierState.INITIAL},
+    CourierState.AWAITING_AREA: {CourierState.AWAITING_DOCUMENT, CourierState.AWAITING_NAME},
+    CourierState.AWAITING_DOCUMENT: {CourierState.PENDING_APPROVAL, CourierState.AWAITING_AREA},
+    CourierState.PENDING_APPROVAL: {CourierState.MENU},
+    CourierState.MENU: {CourierState.INITIAL},  # איפוס
+}
+
+
+def _is_valid_transition(current: str, target: str) -&gt; bool:
+    """בדיקה האם מעבר מותר"""
+    try:
+        current_state = CourierState(current)
+        target_state = CourierState(target)
+
+        if current_state in COURIER_TRANSITIONS:
+            return target_state in COURIER_TRANSITIONS[current_state]
+    except ValueError:
+        pass
+
+    return False
+
+
+async def transition_to(user_id: int, new_state: str) -&gt; bool:
+    """מעבר רק אם מותר"""
+    current = await get_current_state(user_id)
+
+    if not _is_valid_transition(current, new_state):
+        logger.warning(
+            "Invalid transition",
+            extra_data={"current": current, "target": new_state}
+        )
+        return False
+
+    # ביצוע המעבר...
+    return True</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-13">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.13 Transactional Outbox Pattern</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> שומרים הודעות בDB באותה טרנזקציה עם הלוגיקה העסקית. Worker נפרד שולח - מבטיח שלא נאבד הודעות.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">from enum import Enum
+
+class MessageStatus(str, Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    SENT = "sent"
+    FAILED = "failed"
+
+
+class OutboxMessage(Base):
+    """הודעות ממתינות לשליחה"""
+    __tablename__ = "outbox_messages"
+
+    id = Column(Integer, primary_key=True)
+    platform = Column(String(20))  # "whatsapp" / "telegram"
+    recipient_id = Column(String(100))  # מספר טלפון או chat_id
+    message_type = Column(String(50))
+    message_content = Column(JSON)
+    status = Column(Enum(MessageStatus), default=MessageStatus.PENDING)
+    retry_count = Column(Integer, default=0)
+    max_retries = Column(Integer, default=5)
+    next_retry_at = Column(DateTime, nullable=True)
+
+
+async def queue_delivery_broadcast(delivery: Delivery):
+    """הוספת הודעה ל-outbox באותה טרנזקציה"""
+    content = {
+        "delivery_id": delivery.id,
+        "token": delivery.token,
+        "message_text": f"🚚 משלוח חדש! /capture {delivery.token}"
+    }
+
+    # BROADCAST_COURIERS = הworker יפרוש לכל השליחים
+    message = OutboxMessage(
+        platform="telegram",
+        recipient_id="BROADCAST_COURIERS",
+        message_type="delivery_broadcast",
+        message_content=content,
+        status=MessageStatus.PENDING
+    )
+    db.add(message)
+    # לא commit - יקרה ביחד עם יצירת המשלוח!</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-14">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.14 הבחנה בין קבוצות להודעות פרטיות</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> בוואטסאפ צריך להבחין בין הודעות מקבוצות (admin group) להודעות פרטיות מלקוחות.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">async def whatsapp_webhook(payload: WhatsAppWebhookPayload, db):
+    for message in payload.messages:
+        sender_id = message.sender_id or message.from_number
+
+        # בדיקה אם ההודעה מגיעה מקבוצה
+        is_group_message = sender_id.endswith("@g.us")
+
+        if is_group_message:
+            # בדיקה אם זו קבוצת המנהלים
+            if sender_id == settings.WHATSAPP_ADMIN_GROUP_ID:
+                logger.info("Admin group message", extra_data={"text": message.text[:50]})
+
+                # ניסיון לזהות פקודת מנהל
+                response = await handle_admin_group_command(db, message.text)
+
+                if response:
+                    # שליחת תגובה לקבוצה
+                    await send_whatsapp_message(sender_id, response)
+                # הודעות לא-פקודות בקבוצה - מתעלמים
+            else:
+                # הודעה מקבוצה אחרת - מתעלמים
+                logger.debug("Non-admin group, ignoring")
+
+            continue  # לא ממשיכים לזרימה הרגילה
+
+        # הודעה פרטית - המשך טיפול רגיל...
+        user, is_new = await get_or_create_user(db, sender_id)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-15">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.15 שליחה מקבילית עם סיכום תוצאות</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> שליחת broadcast לאלפי משתמשים - מקבילית ומהירה, עם ספירת הצלחות/כשלונות.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">import asyncio
+
+async def broadcast_to_couriers(message_text: str):
+    """שליחה מקבילית לכל השליחים עם סיכום"""
+
+    # שליפת כל השליחים הפעילים
+    whatsapp_couriers = await get_active_couriers("whatsapp")
+    telegram_couriers = await get_active_couriers("telegram")
+
+    content = {"message_text": message_text}
+
+    # יצירת כל ה-tasks
+    tasks = []
+    for courier in whatsapp_couriers:
+        tasks.append(_send_whatsapp_message(courier.phone_number, content))
+    for courier in telegram_couriers:
+        if courier.telegram_chat_id:  # סינון חסרי chat_id
+            tasks.append(_send_telegram_message(courier.telegram_chat_id, content))
+
+    if not tasks:
+        return {"error": "No active couriers", "total_sent": 0}
+
+    # הרצה מקבילית
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # סיכום תוצאות
+    final_results = []
+    for r in results:
+        if isinstance(r, Exception):
+            final_results.append({"success": False, "error": str(r)})
+        else:
+            final_results.append({"success": r})
+
+    successful = sum(1 for r in final_results if r.get("success"))
+
+    return {
+        "total_sent": len(final_results),
+        "successful": successful,
+        "failed": len(final_results) - successful,
+        "results": final_results
+    }</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-16">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.16 סטטוס "דביק" שלא ניתן לשנות</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> משתמש BLOCKED לא יכול להפוך למאושר - הגנה מפני שגיאות אדמין.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">async def _approve_courier(db, user_id: int) -&gt; str:
+    """אישור שליח עם בדיקת סטטוסים דביקים"""
+    user = await get_user(db, user_id)
+
+    if not user:
+        return f"❌ לא נמצא משתמש {user_id}"
+
+    if user.role != UserRole.COURIER:
+        return f"❌ משתמש {user_id} אינו שליח"
+
+    if user.approval_status == ApprovalStatus.APPROVED:
+        return f"ℹ️ שליח {user_id} כבר מאושר"
+
+    # סטטוס BLOCKED הוא "דביק" - לא ניתן לשנות
+    if user.approval_status == ApprovalStatus.BLOCKED:
+        return f"⛔ שליח {user_id} חסום. לא ניתן לאשר משתמש חסום."
+
+    # אישור
+    user.approval_status = ApprovalStatus.APPROVED
+    await db.commit()
+
+    logger.info("Courier approved", extra_data={"user_id": user_id})
+
+    # שליחת הודעה לשליח
+    await notify_user_approved(user)
+
+    return f"✅ שליח {user_id} אושר בהצלחה!"</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-17">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.17 מניעת התראות כפולות במעבר State</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> שמירת state קודם לפני טיפול - שולחים התראה רק במעבר הראשון ל-state חדש.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">async def handle_courier_message(user, text, db):
+    state_manager = StateManager(db)
+
+    # שמירת המצב הקודם לפני הטיפול
+    previous_state = await state_manager.get_current_state(user.id, "telegram")
+
+    # טיפול בהודעה - עלול לשנות state
+    handler = CourierStateHandler(db)
+    response, new_state = await handler.handle_message(user, text)
+
+    # שליחת התראה רק במעבר הראשון ל-PENDING_APPROVAL
+    # (לא אם המשתמש כבר היה ב-state הזה)
+    if (new_state == CourierState.PENDING_APPROVAL.value and
+        previous_state != CourierState.PENDING_APPROVAL.value and
+        user.approval_status == ApprovalStatus.PENDING):
+
+        # שליחת התראה למנהלים - פעם אחת בלבד
+        await notify_admins_new_registration(user)
+
+    return response, new_state</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-18">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.18 כפתורי Inline עם Callback Data</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> יצירת מקלדת inline לטלגרם - כפתורים שנשארים על ההודעה ושולחים callback_data.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">async def send_telegram_message(chat_id: str, text: str, keyboard: list = None, inline: bool = False):
+    """שליחת הודעה עם תמיכה בשני סוגי מקלדות"""
+
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML"
+    }
+
+    if keyboard:
+        if inline:
+            # מקלדת inline - כפתורים על ההודעה
+            inline_keyboard = []
+            for row in keyboard:
+                inline_row = []
+                for button_text in row:
+                    inline_row.append({
+                        "text": button_text,
+                        "callback_data": button_text  # הערך שיחזור ב-callback_query
+                    })
+                inline_keyboard.append(inline_row)
+
+            payload["reply_markup"] = {
+                "inline_keyboard": inline_keyboard
+            }
+        else:
+            # מקלדת רגילה - מחליפה את המקלדת
+            payload["reply_markup"] = {
+                "keyboard": keyboard,
+                "resize_keyboard": True,      # התאמה לגודל
+                "one_time_keyboard": True     # נעלמת אחרי לחיצה
+            }
+
+    await send_to_telegram_api(payload)</code></pre>
+          </div>
+        </div>
+
+        <div class="snippet" id="snippet-57-19">
+          <div class="snippet-header">
+            <h3 class="snippet-title">57.19 Force State ללא ולידציה (איפוס)</h3>
+            <p class="snippet-description"><strong>למה זה שימושי:</strong> לפעמים צריך לאפס את המשתמש לתחילת הזרימה, בלי להתחשב במעברים המותרים.</p>
+          </div>
+          <div class="snippet-content">
+            <button class="copy-button" onclick="copyCode(this)">העתק</button>
+            <pre class="language-python"><code class="language-python">async def force_state(user_id: int, platform: str, new_state: str, context: dict = None):
+    """
+    כפיית state ללא ולידציה - לשימוש באיפוסים ופעולות אדמין.
+    לא בודק מעברים מותרים!
+    """
+    session = await get_or_create_session(user_id, platform)
+    session.current_state = new_state
+
+    if context is not None:
+        session.context_data = context  # החלפה מלאה של ה-context
+
+    await db.commit()
+
+
+# שימוש - טיפול בפקודת /start
+if text.strip().startswith("/start"):
+    # איפוס מלא - ללא קשר ל-state הנוכחי
+    await state_manager.force_state(
+        user.id,
+        "telegram",
+        CourierState.MENU.value,
+        context={}  # ניקוי context
+    )</code></pre>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Back to top button -->
