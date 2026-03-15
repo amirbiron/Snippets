@@ -1,0 +1,11 @@
+{
+  "name": "Snippets - אוסף קטעי קוד Python",
+  "repo": "https://github.com/amirbiron/Snippets",
+  "tags": ["html", "css", "javascript", "python", "snippets", "static-site", "education"],
+  "highlights": [
+    "אתר סטטי עם עשרות קטעי קוד Python מאורגנים בקטגוריות",
+    "כלי המרה אוטומטי מ-Markdown ל-HTML עם תמיכה ב-offset",
+    "ממשק מודרני עם העתקת קוד בלחיצה אחת",
+    "ללא framework - HTML/CSS/JS טהור"
+  ]
+}
